@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xml-editor"
+version = "1.0.0"
+description = "A fully-featured cross-platform XML editor with XPath, validation, and schema support"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "XML Editor Team"}
+]
+keywords = ["xml", "editor", "xpath", "xsd", "xslt", "validation", "schema"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Editors",
+]
+dependencies = [
+    "PyQt6>=6.6.0",
+    "PyQt6-QScintilla>=2.14.0",
+    "lxml>=5.0.0",
+    "pygments>=2.17.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/profiluefter/xml-editor"
+Repository = "https://github.com/profiluefter/xml-editor"
+Issues = "https://github.com/profiluefter/xml-editor/issues"
+
+[project.scripts]
+xml-editor = "xmleditor.main:main"
+
+[project.gui-scripts]
+xml-editor-gui = "xmleditor.main:main"
+
+[tool.setuptools]
+packages = ["xmleditor"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+xmleditor = ["resources/*"]
