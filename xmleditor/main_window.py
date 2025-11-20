@@ -950,7 +950,8 @@ class MainWindow(QMainWindow):
         for index in range(self.tab_widget.count()):
             tab_data = self.tab_data.get(index, {})
             if tab_data.get('is_modified', False):
-                file_name = os.path.basename(tab_data.get('file_path', 'Untitled'))
+                file_path = tab_data.get('file_path')
+                file_name = os.path.basename(file_path) if file_path else 'Untitled'
                 
                 reply = QMessageBox.question(
                     self, "Unsaved Changes",
