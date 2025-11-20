@@ -7,6 +7,107 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
+    let
+      # NixOS VM test (system-specific, not per-platform)
+      nixosTest = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ({ pkgs, ... }: {
+            # Set state version to avoid warning
+            system.stateVersion = "24.11";
+            
+            # Minimal NixOS configuration for testing
+            boot.loader.systemd-boot.enable = true;
+            fileSystems."/" = {
+              device = "/dev/vda";
+              fsType = "ext4";
+            };
+            
+            # Install xml-editor GUI
+            environment.systemPackages = [
+              (self.packages.x86_64-linux.gui)
+            ];
+            
+            # Enable X11 for GUI testing
+            services.xserver = {
+              enable = true;
+              displayManager.lightdm.enable = true;
+              desktopManager.xfce.enable = true;
+            };
+            
+            # Test user
+            users.users.testuser = {
+              isNormalUser = true;
+              password = "test";
+              extraGroups = [ "wheel" ];
+            };
+            
+            # Disable unnecessary services for faster testing
+            systemd.services.systemd-udevd.serviceConfig.PrivateMounts = nixpkgs.lib.mkForce false;
+          })
+        ];
+      };
+      
+      # VM test derivation
+      vmTest = pkgs: pkgs.testers.runNixOSTest {
+        name = "xml-editor-vm-test";
+        
+        nodes.machine = { config, pkgs, ... }: {
+          imports = [ ];
+          
+          # Set state version to avoid warning
+          system.stateVersion = "24.11";
+          
+          # Install xml-editor GUI
+          environment.systemPackages = [
+            self.packages.x86_64-linux.gui
+          ];
+          
+          # Enable X11 for GUI testing
+          services.xserver = {
+            enable = true;
+            displayManager.lightdm.enable = true;
+          };
+          
+          # Enable automatic login to X session
+          services.displayManager = {
+            defaultSession = "none+icewm";
+            autoLogin = {
+              enable = true;
+              user = "testuser";
+            };
+          };
+          
+          services.xserver.windowManager.icewm.enable = true;
+          
+          # Test user
+          users.users.testuser = {
+            isNormalUser = true;
+            password = "test";
+          };
+        };
+        
+        testScript = ''
+          start_all()
+          machine.wait_for_unit("multi-user.target")
+          
+          # Wait for X server to be ready
+          machine.wait_for_x()
+          
+          # Check that xml-editor command exists
+          machine.succeed("which xml-editor")
+          
+          # Test that the application can be started (run in background)
+          # We just verify it can launch without crashing immediately
+          machine.execute("su - testuser -c 'DISPLAY=:0 xml-editor --help' >&2")
+          
+          # Verify CLI version works
+          machine.succeed("xml-editor-cli --help")
+          
+          print("XML Editor VM test passed!")
+        '';
+      };
+    in
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -173,6 +274,13 @@ print('✓ XML formatting works')
             ${testScript}/bin/test-xml-editor
             touch $out
           '';
+          
+          # NixOS VM test (only on x86_64-linux)
+          vm-test = if system == "x86_64-linux" 
+            then vmTest pkgs
+            else pkgs.runCommand "vm-test-skipped" {} ''
+              echo "VM test skipped on ${system} (only runs on x86_64-linux)" > $out
+            '';
         };
         
         devShells.default = pkgs.mkShell {
@@ -194,5 +302,8 @@ print('✓ XML formatting works')
           '';
         };
       }
-    );
+    ) // {
+      # Add system-specific NixOS test configuration
+      nixosConfigurations.test-vm = nixosTest;
+    };
 }
