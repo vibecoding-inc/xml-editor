@@ -5,18 +5,21 @@ A fully-featured cross-platform XML editor desktop application built with Python
 ## Features
 
 ### Core Features
+- **Multiple File Tabs**: Open and edit multiple XML, XSD, and DTD files simultaneously in separate tabs
 - **XML Syntax Highlighting**: Advanced syntax highlighting using QScintilla
 - **File Operations**: Open, save, and manage XML files with recent files list
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 
 ### XML Features
+- **Persistent Validation Pane**: Dockable validation panel for continuous validation without modal dialogs
 - **XML Validation**: Check well-formedness and validate against schemas
 - **XML Schema (XSD) Support**: Full XSD validation with detailed error messages
 - **DTD Support**: Validate XML against DTD definitions
 - **XML Formatting**: Automatic formatting and pretty-printing
-- **Tree View**: Visual representation of XML structure
+- **Tree View**: Visual representation of XML structure that syncs with active tab
 
 ### Advanced Features
+- **Side-by-Side Editing**: Edit XML and its schema simultaneously in different tabs
 - **XPath Queries**: Execute XPath expressions with results display
 - **XSLT Transformations**: Apply XSLT stylesheets to transform XML
 - **Find & Replace**: Search and replace text in documents
@@ -25,7 +28,7 @@ A fully-featured cross-platform XML editor desktop application built with Python
 - **Line Numbers**: Easy navigation with line numbers
 - **Code Folding**: Collapse/expand XML elements
 - **Brace Matching**: Highlight matching tags
-- **Undo/Redo**: Full undo/redo support
+- **Undo/Redo**: Full undo/redo support per tab
 
 ## Installation
 
@@ -92,11 +95,33 @@ python -m xmleditor.main
 ### Quick Start
 
 1. **Create a new XML document**: File → New (Ctrl+N)
-2. **Open existing XML file**: File → Open (Ctrl+O)
-3. **Format XML**: XML → Format XML (Ctrl+Shift+F)
-4. **Validate XML**: XML → Validate (Ctrl+Shift+V)
-5. **Execute XPath**: XML → XPath Query (Ctrl+Shift+X)
-6. **Apply XSLT**: XML → XSLT Transform (Ctrl+Shift+T)
+2. **Open existing XML file**: File → Open (Ctrl+O) - Opens in a new tab
+3. **Open multiple files**: Open additional files in separate tabs
+4. **Format XML**: XML → Format XML (Ctrl+Shift+F)
+5. **Validate XML**: XML → Validate (Ctrl+Shift+V) - Opens validation pane
+6. **Execute XPath**: XML → XPath Query (Ctrl+Shift+X)
+7. **Apply XSLT**: XML → XSLT Transform (Ctrl+Shift+T)
+
+### Working with Multiple Files
+
+The editor supports multiple files open simultaneously in tabs:
+
+- **Open Multiple Files**: Each file opens in its own tab with independent editing state
+- **Switch Between Tabs**: Click on tabs or use Ctrl+Tab to navigate
+- **Close Tabs**: Click the X button on each tab or use Ctrl+W
+- **Prevent Duplicates**: Opening the same file again switches to the existing tab
+- **Edit XML and Schema Together**: Open XML in one tab and XSD/DTD in another for side-by-side editing
+
+### Using the Validation Pane
+
+The persistent validation pane allows continuous validation without modal dialogs:
+
+- **Toggle Validation Pane**: View → Toggle Validation Panel (Ctrl+Shift+P)
+- **Well-Formed Check**: Quick validation that XML is syntactically correct
+- **XSD Validation**: Load schema and validate XML against it
+- **DTD Validation**: Load DTD and validate XML against it
+- **Load Schema**: Click "Load Schema File" to load .xsd or .dtd files
+- **Stay Productive**: Keep validation pane open while editing for instant feedback
 
 ### Keyboard Shortcuts
 
@@ -106,6 +131,7 @@ python -m xmleditor.main
 | Open File | Ctrl+O |
 | Save File | Ctrl+S |
 | Save As | Ctrl+Shift+S |
+| Close Tab | Ctrl+W |
 | Undo | Ctrl+Z |
 | Redo | Ctrl+Y |
 | Cut | Ctrl+X |
@@ -119,6 +145,7 @@ python -m xmleditor.main
 | XSLT Transform | Ctrl+Shift+T |
 | Toggle Tree View | Ctrl+T |
 | Toggle Output Panel | Ctrl+O |
+| Toggle Validation Panel | Ctrl+Shift+P |
 | Comment/Uncomment | Ctrl+/ |
 | Refresh Tree | F5 |
 
