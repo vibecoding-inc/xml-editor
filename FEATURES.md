@@ -182,9 +182,17 @@ count(//element)             - Count elements
 - **Resizable Splitters**: Adjust panel sizes
 
 #### Themes and Styling
-- **Fusion Style**: Modern Qt Fusion theme
-- **Color Scheme**: Professional color coding
-- **Font**: Monospace font for code
+- **Modern Color Schemes**: Catppuccin theme family for enhanced readability
+- **System Theme Detection**: Automatically adapts to system dark/light mode
+- **Multiple Theme Options**: 
+  - System (Auto) - Detects and applies appropriate theme
+  - Catppuccin Latte - Light, warm theme for daytime
+  - Catppuccin Frappé - Soft dark theme with muted colors
+  - Catppuccin Macchiato - Medium dark theme with vibrant accents
+  - Catppuccin Mocha - Deep dark theme for low-light environments
+- **Consistent Theming**: All UI elements follow theme colors
+- **Persistent Preference**: Theme choice saved across sessions
+- **Font**: Monospace font for code (Courier New)
 - **Customizable**: Font size and family
 
 ### Keyboard Shortcuts
@@ -229,7 +237,7 @@ count(//element)             - Count elements
 - **Editor Font**: Change font and size
 - **Word Wrap**: Enable/disable wrapping
 - **Indentation**: Spaces or tabs
-- **Theme**: Application styling
+- **Theme**: Choose from multiple Catppuccin themes or use system auto-detect
 
 ### Cross-Platform Support
 
@@ -303,7 +311,6 @@ count(//element)             - Count elements
 - Multiple file tabs
 - Project management
 - Git integration
-- Custom themes
 
 ## Feature Comparison
 
