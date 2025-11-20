@@ -131,9 +131,10 @@ class MonacoEditor(QWidget):
     def _set_content_internal(self, text):
         """Internal method to set content via JavaScript."""
         self._suppress_change_signal = True
-        # Escape special characters for JavaScript
-        escaped_text = text.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
-        js_code = f'window.monacoEditor.setContent(`{escaped_text}`);'
+        # Properly escape content using JSON encoding
+        import json
+        escaped_text = json.dumps(text)
+        js_code = f'window.monacoEditor.setContent({escaped_text});'
         self.web_view.page().runJavaScript(js_code)
         self._suppress_change_signal = False
     

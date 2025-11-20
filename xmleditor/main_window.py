@@ -22,6 +22,10 @@ from xmleditor.xml_utils import XMLUtilities
 from xmleditor.theme_manager import ThemeManager, ThemeType
 
 
+# Configuration constants
+DEFAULT_USE_MONACO_EDITOR = True  # Use Monaco editor by default (supports collaboration)
+
+
 class MainWindow(QMainWindow):
     """Main application window."""
     
@@ -41,7 +45,7 @@ class MainWindow(QMainWindow):
         self.show_namespaces = self.settings.value("show_namespaces", False, type=bool)
         
         # Load editor preference (True for Monaco, False for QScintilla)
-        self.use_monaco_editor = self.settings.value("use_monaco_editor", True, type=bool)
+        self.use_monaco_editor = self.settings.value("use_monaco_editor", DEFAULT_USE_MONACO_EDITOR, type=bool)
         
         # Track collaboration state
         self.collaboration_active = False

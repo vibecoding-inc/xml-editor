@@ -33,12 +33,17 @@
     <div id="container"></div>
     
     <!-- Load Monaco Editor from CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+    <!-- Note: For production, generate SRI hashes using: https://www.srihash.org/ -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js" 
+            crossorigin="anonymous"></script>
     
     <!-- Load Yjs and Y-Monaco bindings -->
-    <script src="https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/y-monaco@0.1.6/dist/y-monaco.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/y-websocket@1.5.0/dist/y-websocket.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.min.js" 
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/y-monaco@0.1.6/dist/y-monaco.min.js" 
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/y-websocket@1.5.0/dist/y-websocket.min.js" 
+            crossorigin="anonymous"></script>
     
     <!-- Load QWebChannel for Python communication -->
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>

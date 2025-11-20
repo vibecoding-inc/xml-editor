@@ -34,8 +34,8 @@ class HostSessionDialog(QDialog):
         
         self.server_input = QLineEdit()
         self.server_input.setPlaceholderText("wss://your-worker.workers.dev")
-        # Default to a placeholder - users will need to deploy their own
-        self.server_input.setText("wss://xml-editor-collab.workers.dev")
+        # Placeholder URL - users must deploy their own worker
+        self.server_input.setText("wss://your-worker.workers.dev")
         server_layout.addWidget(self.server_input)
         
         layout.addLayout(server_layout)
@@ -116,7 +116,7 @@ class JoinSessionDialog(QDialog):
         
         self.server_input = QLineEdit()
         self.server_input.setPlaceholderText("wss://your-worker.workers.dev")
-        self.server_input.setText("wss://xml-editor-collab.workers.dev")
+        self.server_input.setText("wss://your-worker.workers.dev")
         server_layout.addWidget(self.server_input)
         
         layout.addLayout(server_layout)
