@@ -107,6 +107,28 @@
           # Test that the GUI application binary is executable
           machine.succeed("test -x $(which xml-editor)")
           
+          # Launch the GUI application in the background and verify it runs for 10 seconds
+          print("Launching GUI application...")
+          machine.succeed("su - testuser -c 'DISPLAY=:0 xml-editor &' >&2")
+          
+          # Give the application a moment to start
+          import time
+          time.sleep(2)
+          
+          # Check that the process is running
+          machine.succeed("pgrep -f xml-editor")
+          print("GUI application started successfully")
+          
+          # Wait 10 seconds while checking the process is still alive
+          for i in range(8):
+              time.sleep(1)
+              machine.succeed("pgrep -f xml-editor")
+          
+          print("GUI application has been running for 10+ seconds without crashing")
+          
+          # Clean up - kill the application (use execute instead of succeed to ignore exit code)
+          machine.execute("pkill -f xml-editor")
+          
           print("XML Editor VM test passed!")
         '';
       };

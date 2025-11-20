@@ -74,7 +74,10 @@ The NixOS VM test is a unique feature that validates the application can run in 
 2. Installs the xml-editor GUI package
 3. Verifies both GUI and CLI commands are available
 4. Tests that the CLI can run successfully
-5. Ensures the GUI binary is executable
+5. **Launches the GUI application and verifies it runs for at least 10 seconds without crashing**
+6. Ensures the GUI binary is executable
+
+This comprehensive test ensures the application not only installs correctly but also launches and runs stably.
 
 ### How to Run Locally
 
@@ -92,7 +95,8 @@ nix build .#checks.x86_64-linux.functionality
 ### VM Test Details
 - **VM Configuration**: Minimal NixOS with lightdm and icewm
 - **Auto-login**: Enabled for testing
-- **Test Duration**: ~20-30 seconds
+- **GUI Launch Test**: Application is started and must run for 10+ seconds without crashing
+- **Test Duration**: ~35 seconds (including GUI runtime verification)
 - **Platform**: x86_64-linux only (skipped on other platforms)
 
 ## Local Testing
