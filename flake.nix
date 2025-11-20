@@ -97,12 +97,15 @@
           # Check that xml-editor command exists
           machine.succeed("which xml-editor")
           
-          # Test that the application can be started (run in background)
-          # We just verify it can launch without crashing immediately
-          machine.execute("su - testuser -c 'DISPLAY=:0 xml-editor --help' >&2")
+          # Check that xml-editor-cli command exists and works
+          machine.succeed("which xml-editor-cli")
           
-          # Verify CLI version works
+          # Verify CLI version works (non-GUI)
+          # This test already validates that the Python module is accessible
           machine.succeed("xml-editor-cli --help")
+          
+          # Test that the GUI application binary is executable
+          machine.succeed("test -x $(which xml-editor)")
           
           print("XML Editor VM test passed!")
         '';
