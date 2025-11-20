@@ -13,6 +13,8 @@ jobs:
   build-python-packages:
     name: Build Python Package (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -43,6 +45,8 @@ jobs:
   build-nix-packages:
     name: Build Nix Package (${{ matrix.system }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         system: [x86_64-linux, aarch64-linux]
@@ -90,6 +94,8 @@ jobs:
     needs: [build-python-packages, build-nix-packages]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
+    permissions:
+      contents: write
     
     steps:
       - name: Download all artifacts
