@@ -53,6 +53,13 @@ When you first launch XML Editor, you'll see:
 - **Save As**: File → Save As (or Ctrl+Shift+S)
   - Save with a new name or location
 
+- **Auto Save**: File → Auto Save
+  - Check to enable automatic saving every 30 seconds
+  - Only saves files that have been saved before (not "Untitled" documents)
+  - Saves all open modified files automatically
+  - Status bar shows "Auto-saved X file(s)" when files are saved
+  - Your preference is saved and restored when you reopen the application
+
 ### Recent Files
 
 - **File → Recent Files** shows your 10 most recent files
@@ -242,6 +249,9 @@ Shows:
 - Operation results
 
 ## Tips and Tricks
+
+### Auto-Save for Safety
+Enable auto-save (File → Auto Save) to automatically save your work every 30 seconds. This helps prevent data loss in case of unexpected crashes or power failures.
 
 ### Quick Formatting
 Select text and press Ctrl+Shift+F to format selection.

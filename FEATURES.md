@@ -33,6 +33,11 @@
 - **Open File**: Open any XML file
 - **Save**: Save current document
 - **Save As**: Save with new name/location
+- **Auto Save**: Automatically save files every 30 seconds
+  - Checkbox in File menu to enable/disable
+  - Only saves files with known paths (not "Untitled" documents)
+  - Saves all modified open files
+  - Preference persists across sessions
 - **Recent Files**: Quick access to last 10 opened files
 - **Auto-Save Settings**: Window state and preferences saved
 
