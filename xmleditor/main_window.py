@@ -34,6 +34,9 @@ class MainWindow(QMainWindow):
             self.current_theme = ThemeType(theme_name)
         except ValueError:
             self.current_theme = ThemeType.SYSTEM
+        
+        # Load namespace display preference
+        self.show_namespaces = self.settings.value("show_namespaces", False, type=bool)
             
         # Create timer for auto-refreshing tree view
         self.tree_refresh_timer = QTimer()
@@ -257,6 +260,12 @@ class MainWindow(QMainWindow):
         word_wrap_action.setCheckable(True)
         word_wrap_action.triggered.connect(self.toggle_word_wrap)
         view_menu.addAction(word_wrap_action)
+        
+        show_namespaces_action = QAction("Show &Namespaces in Tree", self)
+        show_namespaces_action.setCheckable(True)
+        show_namespaces_action.setChecked(self.show_namespaces)
+        show_namespaces_action.triggered.connect(self.toggle_show_namespaces)
+        view_menu.addAction(show_namespaces_action)
         
         view_menu.addSeparator()
         
@@ -760,7 +769,7 @@ class MainWindow(QMainWindow):
         
         if content:
             try:
-                self.tree_view.load_xml(content)
+                self.tree_view.load_xml(content, self.show_namespaces)
                 self.output_panel.clear()
                 self.output_dock.hide()
             except Exception as e:
@@ -779,7 +788,7 @@ class MainWindow(QMainWindow):
         
         if content:
             try:
-                self.tree_view.load_xml(content)
+                self.tree_view.load_xml(content, self.show_namespaces)
                 # Don't clear/hide output panel during auto-refresh to avoid disruption
             except Exception:
                 # Silently fail during auto-refresh (user is still typing)
@@ -885,6 +894,14 @@ class MainWindow(QMainWindow):
                 editor.setWrapMode(QsciScintilla.WrapMode.WrapWord)
             else:
                 editor.setWrapMode(QsciScintilla.WrapMode.WrapNone)
+    
+    def toggle_show_namespaces(self, checked):
+        """Toggle namespace display in tree view."""
+        self.show_namespaces = checked
+        self.settings.setValue("show_namespaces", checked)
+        self.refresh_tree_view()
+        status = "shown" if checked else "hidden"
+        self.statusBar().showMessage(f"Namespaces {status} in tree view")
 
     def change_theme(self, theme_type):
         """Change the editor theme."""
