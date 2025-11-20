@@ -8,6 +8,7 @@ A fully-featured cross-platform XML editor desktop application built with Python
 - **Multiple File Tabs**: Open and edit multiple XML, XSD, and DTD files simultaneously in separate tabs
 - **XML Syntax Highlighting**: Advanced syntax highlighting using QScintilla
 - **File Operations**: Open, save, and manage XML files with recent files list
+- **Auto Save**: Automatically save files every 30 seconds with an easy-to-use checkbox in the File menu
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 
 ### XML Features
