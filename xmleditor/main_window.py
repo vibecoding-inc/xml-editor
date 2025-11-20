@@ -1381,11 +1381,3 @@ class MainWindow(QMainWindow):
         )
         self.collaboration_active = False
         self.disconnect_action.setEnabled(False)
-            <li>XML tree view</li>
-            <li>XML formatting</li>
-            <li>Find and replace</li>
-            <li>Recent files</li>
-        </ul>
-        <p>Built with Python and PyQt6</p>
-        """
-        QMessageBox.about(self, "About XML Editor", about_text)

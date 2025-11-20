@@ -21,6 +21,7 @@ A fully-featured cross-platform XML editor desktop application built with Python
 - **Tree View**: Visual representation of XML structure that syncs with active tab
 
 ### Advanced Features
+- **Real-time Collaboration**: Work together on documents with multiple users simultaneously (see [MULTIPLAYER.md](MULTIPLAYER.md))
 - **Side-by-Side Editing**: Edit XML and its schema simultaneously in different tabs
 - **XPath Queries**: Execute XPath expressions with results display
 - **XSLT Transformations**: Apply XSLT stylesheets to transform XML
@@ -171,6 +172,28 @@ To change themes, go to **View → Theme** and select your preferred option. You
 | Toggle Validation Panel | Ctrl+Shift+P |
 | Comment/Uncomment | Ctrl+/ |
 | Refresh Tree | F5 |
+| Host Collaboration | Ctrl+Shift+H |
+| Join Collaboration | Ctrl+Shift+J |
+| Disconnect Collaboration | Ctrl+Shift+D |
+
+### Multiplayer Collaboration
+
+The XML Editor now supports real-time collaborative editing! Multiple users can work on the same document simultaneously with automatic conflict resolution.
+
+**Quick Start:**
+1. Deploy the Cloudflare Worker (see [MULTIPLAYER.md](MULTIPLAYER.md))
+2. Use **Collaboration → Host Session** to create a room
+3. Share the room name with collaborators
+4. They can join using **Collaboration → Join Session**
+
+Features:
+- ✓ Real-time synchronization using Y.js CRDTs
+- ✓ Automatic conflict resolution
+- ✓ No data loss from concurrent edits
+- ✓ Easy-to-use host/join dialogs
+- ✓ Built on Cloudflare's global edge network
+
+For detailed setup and usage instructions, see [MULTIPLAYER.md](MULTIPLAYER.md).
 
 ## Features Comparison with XMLSpy
 
