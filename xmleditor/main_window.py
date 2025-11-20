@@ -14,6 +14,7 @@ from xmleditor.xml_tree_view import XMLTreeView
 from xmleditor.xpath_dialog import XPathDialog
 from xmleditor.validation_dialog import ValidationDialog
 from xmleditor.xslt_dialog import XSLTDialog
+from xmleditor.schema_generation_dialog import SchemaGenerationDialog
 from xmleditor.xml_utils import XMLUtilities
 
 
@@ -182,6 +183,14 @@ class MainWindow(QMainWindow):
         validate_action.setStatusTip("Validate XML")
         validate_action.triggered.connect(self.validate_xml)
         xml_menu.addAction(validate_action)
+        
+        xml_menu.addSeparator()
+        
+        generate_schema_action = QAction("&Generate Schema...", self)
+        generate_schema_action.setShortcut(QKeySequence("Ctrl+Shift+G"))
+        generate_schema_action.setStatusTip("Generate XSD or DTD schema from XML")
+        generate_schema_action.triggered.connect(self.show_schema_generation_dialog)
+        xml_menu.addAction(generate_schema_action)
         
         xml_menu.addSeparator()
         
@@ -388,6 +397,17 @@ class MainWindow(QMainWindow):
             return
         
         dialog = ValidationDialog(content, self)
+        dialog.exec()
+    
+    def show_schema_generation_dialog(self):
+        """Open schema generation dialog."""
+        content = self.editor.get_text().strip()
+        
+        if not content:
+            QMessageBox.warning(self, "Warning", "No XML content to generate schema from")
+            return
+        
+        dialog = SchemaGenerationDialog(content, self)
         dialog.exec()
         
     def show_xpath_dialog(self):

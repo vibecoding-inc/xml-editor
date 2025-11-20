@@ -231,3 +231,315 @@ class XMLUtilities:
             return [element_to_dict(tree)]
         except Exception as e:
             raise ValueError(f"Error getting XML structure: {str(e)}")
+    
+    @staticmethod
+    def generate_xsd_schema(xml_string: str) -> str:
+        """
+        Generate XSD schema from XML document.
+        
+        Args:
+            xml_string: XML content as string
+            
+        Returns:
+            Generated XSD schema as string
+        """
+        try:
+            tree = etree.fromstring(xml_string.encode('utf-8'))
+            
+            # Analyze the XML structure
+            element_info = XMLUtilities._analyze_elements(tree)
+            
+            # Build XSD schema
+            schema_root = etree.Element(
+                '{http://www.w3.org/2001/XMLSchema}schema',
+                nsmap={'xs': 'http://www.w3.org/2001/XMLSchema'}
+            )
+            
+            # Generate element definitions for all elements
+            generated = set()
+            XMLUtilities._generate_xsd_element_recursive(schema_root, tree.tag, element_info, generated)
+            
+            # Pretty print the schema
+            return etree.tostring(schema_root, encoding='unicode', pretty_print=True)
+        except Exception as e:
+            raise ValueError(f"XSD schema generation error: {str(e)}")
+    
+    @staticmethod
+    def _generate_xsd_element_recursive(parent, element_name: str, all_element_info: dict, generated: set):
+        """
+        Recursively generate XSD element definitions.
+        
+        Args:
+            parent: Parent XSD element
+            element_name: Name of the element
+            all_element_info: All element information
+            generated: Set of already generated element names
+        """
+        if element_name in generated:
+            return
+        generated.add(element_name)
+        
+        element_info = all_element_info[element_name]
+        xs_ns = '{http://www.w3.org/2001/XMLSchema}'
+        
+        element = etree.SubElement(parent, f'{xs_ns}element')
+        element.set('name', element_name)
+        
+        # Create complex or simple type
+        if element_info['children'] or element_info['attributes']:
+            complex_type = etree.SubElement(element, f'{xs_ns}complexType')
+            
+            # Handle children
+            if element_info['children']:
+                sequence = etree.SubElement(complex_type, f'{xs_ns}sequence')
+                
+                for child_name, child_occ in sorted(element_info['children'].items()):
+                    child_info = all_element_info[child_name]
+                    
+                    # Check if child has its own children or attributes
+                    if child_info['children'] or child_info['attributes']:
+                        # Reference will be generated separately
+                        child_elem = etree.SubElement(sequence, f'{xs_ns}element')
+                        child_elem.set('ref', child_name)
+                    else:
+                        # Inline simple type
+                        child_elem = etree.SubElement(sequence, f'{xs_ns}element')
+                        child_elem.set('name', child_name)
+                        if child_info['text_content']:
+                            data_type = XMLUtilities._infer_xsd_type(child_info['text_content'])
+                            child_elem.set('type', data_type)
+                        else:
+                            child_elem.set('type', 'xs:string')
+                    
+                    # Set occurrence constraints
+                    if child_occ['min'] == 0:
+                        child_elem.set('minOccurs', '0')
+                    if child_occ['max'] > 1:
+                        child_elem.set('maxOccurs', 'unbounded')
+            
+            # Handle text content with attributes
+            elif element_info['text_content']:
+                simple_content = etree.SubElement(complex_type, f'{xs_ns}simpleContent')
+                extension = etree.SubElement(simple_content, f'{xs_ns}extension')
+                data_type = XMLUtilities._infer_xsd_type(element_info['text_content'])
+                extension.set('base', data_type)
+                
+                # Add attributes to extension
+                for attr_name, attr_info in sorted(element_info['attributes'].items()):
+                    attr_elem = etree.SubElement(extension, f'{xs_ns}attribute')
+                    attr_elem.set('name', attr_name)
+                    attr_elem.set('type', 'xs:string')
+                    if attr_info['required']:
+                        attr_elem.set('use', 'required')
+            
+            # Handle attributes (when no text content)
+            if element_info['attributes'] and not element_info['text_content']:
+                for attr_name, attr_info in sorted(element_info['attributes'].items()):
+                    attr_elem = etree.SubElement(complex_type, f'{xs_ns}attribute')
+                    attr_elem.set('name', attr_name)
+                    attr_elem.set('type', 'xs:string')
+                    if attr_info['required']:
+                        attr_elem.set('use', 'required')
+        else:
+            # Simple type with text content only
+            if element_info['text_content']:
+                data_type = XMLUtilities._infer_xsd_type(element_info['text_content'])
+                element.set('type', data_type)
+            else:
+                element.set('type', 'xs:string')
+        
+        # Recursively generate child elements that need separate definitions
+        for child_name in element_info['children']:
+            child_info = all_element_info[child_name]
+            if (child_info['children'] or child_info['attributes']) and child_name not in generated:
+                XMLUtilities._generate_xsd_element_recursive(parent, child_name, all_element_info, generated)
+    
+    @staticmethod
+    def generate_dtd_schema(xml_string: str) -> str:
+        """
+        Generate DTD schema from XML document.
+        
+        Args:
+            xml_string: XML content as string
+            
+        Returns:
+            Generated DTD schema as string
+        """
+        try:
+            tree = etree.fromstring(xml_string.encode('utf-8'))
+            
+            # Analyze the XML structure
+            element_info = XMLUtilities._analyze_elements(tree)
+            
+            # Build DTD schema
+            dtd_lines = []
+            
+            # Generate DTD element declarations
+            for element_name, info in sorted(element_info.items()):
+                dtd_lines.append(XMLUtilities._generate_dtd_element(element_name, info))
+            
+            return '\n'.join(dtd_lines)
+        except Exception as e:
+            raise ValueError(f"DTD schema generation error: {str(e)}")
+    
+    @staticmethod
+    def _analyze_elements(root: etree._Element) -> dict:
+        """
+        Analyze XML elements to determine structure and patterns.
+        
+        Args:
+            root: Root element of XML tree
+            
+        Returns:
+            Dictionary with element information
+        """
+        element_info = {}
+        
+        def analyze_element(element, parent_tag=None):
+            tag = element.tag
+            
+            # Initialize element info if not exists
+            if tag not in element_info:
+                element_info[tag] = {
+                    'children': {},
+                    'attributes': {},
+                    'text_content': [],
+                    'parent_tags': set(),
+                    'count_by_parent': {}
+                }
+            
+            info = element_info[tag]
+            
+            # Track parent relationship
+            if parent_tag:
+                info['parent_tags'].add(parent_tag)
+                if parent_tag not in info['count_by_parent']:
+                    info['count_by_parent'][parent_tag] = []
+            
+            # Analyze attributes
+            for attr_name, attr_value in element.attrib.items():
+                if attr_name not in info['attributes']:
+                    info['attributes'][attr_name] = {'values': [], 'required': True}
+                info['attributes'][attr_name]['values'].append(attr_value)
+            
+            # Track text content
+            if element.text and element.text.strip():
+                info['text_content'].append(element.text.strip())
+            
+            # Analyze children
+            child_counts = {}
+            for child in element:
+                child_tag = child.tag
+                child_counts[child_tag] = child_counts.get(child_tag, 0) + 1
+                
+                if child_tag not in info['children']:
+                    info['children'][child_tag] = {'min': float('inf'), 'max': 0}
+                
+                analyze_element(child, tag)
+            
+            # Update child occurrence counts
+            for child_tag, count in child_counts.items():
+                child_info = info['children'][child_tag]
+                child_info['min'] = min(child_info['min'], count)
+                child_info['max'] = max(child_info['max'], count)
+            
+            # Mark missing children as optional (min=0)
+            for child_tag in info['children']:
+                if child_tag not in child_counts:
+                    info['children'][child_tag]['min'] = 0
+        
+        analyze_element(root)
+        
+        # Determine attribute requirements
+        for tag, info in element_info.items():
+            for attr_name, attr_info in info['attributes'].items():
+                # If not present in all instances, it's optional
+                instances_count = len(info['text_content']) + sum(
+                    len(counts) for counts in info['count_by_parent'].values()
+                )
+                if instances_count == 0:
+                    instances_count = 1  # At least the element itself
+                attr_info['required'] = len(attr_info['values']) >= instances_count
+        
+        return element_info
+    
+    @staticmethod
+    def _infer_xsd_type(text_values: List[str]) -> str:
+        """
+        Infer XSD data type from text content.
+        
+        Args:
+            text_values: List of text values
+            
+        Returns:
+            XSD type name
+        """
+        if not text_values:
+            return 'xs:string'
+        
+        # Try to determine if all values are integers
+        all_int = True
+        all_decimal = True
+        
+        for value in text_values:
+            try:
+                int(value)
+            except ValueError:
+                all_int = False
+            
+            try:
+                float(value)
+            except ValueError:
+                all_decimal = False
+        
+        if all_int:
+            return 'xs:integer'
+        elif all_decimal:
+            return 'xs:decimal'
+        else:
+            return 'xs:string'
+    
+    @staticmethod
+    def _generate_dtd_element(element_name: str, element_info: dict) -> str:
+        """
+        Generate DTD element declaration.
+        
+        Args:
+            element_name: Name of the element
+            element_info: Element information dictionary
+            
+        Returns:
+            DTD element declaration string
+        """
+        lines = []
+        
+        # Generate element declaration
+        if element_info['children']:
+            # Element has children
+            child_specs = []
+            for child_name, child_occ in sorted(element_info['children'].items()):
+                spec = child_name
+                if child_occ['min'] == 0 and child_occ['max'] == 1:
+                    spec += '?'
+                elif child_occ['min'] == 0 and child_occ['max'] > 1:
+                    spec += '*'
+                elif child_occ['max'] > 1:
+                    spec += '+'
+                child_specs.append(spec)
+            
+            content_model = ', '.join(child_specs)
+            lines.append(f'<!ELEMENT {element_name} ({content_model})>')
+        elif element_info['text_content']:
+            # Element has text content
+            lines.append(f'<!ELEMENT {element_name} (#PCDATA)>')
+        else:
+            # Empty element
+            lines.append(f'<!ELEMENT {element_name} EMPTY>')
+        
+        # Generate attribute declarations
+        if element_info['attributes']:
+            for attr_name, attr_info in sorted(element_info['attributes'].items()):
+                required = '#REQUIRED' if attr_info['required'] else '#IMPLIED'
+                lines.append(f'<!ATTLIST {element_name} {attr_name} CDATA {required}>')
+        
+        return '\n'.join(lines)
