@@ -68,7 +68,7 @@ CATPPUCCIN_LATTE = Theme(
         # UI colors
         "caret_line": "#e6e9ef",     # Current line highlight
         "selection": "#ccd0da",       # Selection background
-        "matched_brace": "#40a02b",  # Matched brace highlight
+        "matched_brace": "#04a5e5",  # Matched brace highlight (sky - bright blue for visibility)
         "edge_color": "#dce0e8",     # Edge column
     }
 )
@@ -106,7 +106,7 @@ CATPPUCCIN_FRAPPE = Theme(
         
         "caret_line": "#3b4252",
         "selection": "#414559",
-        "matched_brace": "#a6d189",
+        "matched_brace": "#99d1db",  # Matched brace highlight (sky - bright for visibility)
         "edge_color": "#414559",
     }
 )
@@ -144,7 +144,7 @@ CATPPUCCIN_MACCHIATO = Theme(
         
         "caret_line": "#2c2f40",
         "selection": "#363a4f",
-        "matched_brace": "#a6da95",
+        "matched_brace": "#91d7e3",  # Matched brace highlight (sky - bright for visibility)
         "edge_color": "#363a4f",
     }
 )
@@ -182,7 +182,7 @@ CATPPUCCIN_MOCHA = Theme(
         
         "caret_line": "#262637",
         "selection": "#313244",
-        "matched_brace": "#a6e3a1",
+        "matched_brace": "#89dceb",  # Matched brace highlight (sky - bright for visibility)
         "edge_color": "#313244",
     }
 )
