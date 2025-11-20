@@ -6,7 +6,7 @@ import os
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                               QSplitter, QMenuBar, QMenu, QToolBar, QFileDialog, 
                               QMessageBox, QInputDialog, QDockWidget, QTextEdit,
-                              QLabel, QStatusBar)
+                              QLabel, QStatusBar, QTabWidget, QPushButton, QTabBar)
 from PyQt6.QtGui import QAction, QKeySequence, QIcon
 from PyQt6.QtCore import Qt, QSettings
 from xmleditor.xml_editor import XMLEditor
@@ -22,10 +22,9 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.current_file = None
-        self.is_modified = False
         self.settings = QSettings("XMLEditor", "XMLEditor")
         self.recent_files = self.load_recent_files()
+        self.tab_data = {}  # Map tab index to {file_path, is_modified}
         self.init_ui()
         self.create_new_document()
         
@@ -45,10 +44,13 @@ class MainWindow(QMainWindow):
         # Create splitter for editor and tree view
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Create editor
-        self.editor = XMLEditor()
-        self.editor.textChanged.connect(self.on_text_changed)
-        splitter.addWidget(self.editor)
+        # Create tab widget for multiple editors
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.setMovable(True)
+        self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        splitter.addWidget(self.tab_widget)
         
         # Create tree view
         self.tree_view = XMLTreeView()
@@ -61,6 +63,9 @@ class MainWindow(QMainWindow):
         
         # Create error/output panel as dock widget
         self.create_output_panel()
+        
+        # Create validation panel as dock widget
+        self.create_validation_panel()
         
         # Create menu bar
         self.create_menu_bar()
@@ -124,29 +129,29 @@ class MainWindow(QMainWindow):
         
         undo_action = QAction("&Undo", self)
         undo_action.setShortcut(QKeySequence.StandardKey.Undo)
-        undo_action.triggered.connect(self.editor.undo)
+        undo_action.triggered.connect(lambda: self.get_current_editor() and self.get_current_editor().undo())
         edit_menu.addAction(undo_action)
         
         redo_action = QAction("&Redo", self)
         redo_action.setShortcut(QKeySequence.StandardKey.Redo)
-        redo_action.triggered.connect(self.editor.redo)
+        redo_action.triggered.connect(lambda: self.get_current_editor() and self.get_current_editor().redo())
         edit_menu.addAction(redo_action)
         
         edit_menu.addSeparator()
         
         cut_action = QAction("Cu&t", self)
         cut_action.setShortcut(QKeySequence.StandardKey.Cut)
-        cut_action.triggered.connect(self.editor.cut)
+        cut_action.triggered.connect(lambda: self.get_current_editor() and self.get_current_editor().cut())
         edit_menu.addAction(cut_action)
         
         copy_action = QAction("&Copy", self)
         copy_action.setShortcut(QKeySequence.StandardKey.Copy)
-        copy_action.triggered.connect(self.editor.copy)
+        copy_action.triggered.connect(lambda: self.get_current_editor() and self.get_current_editor().copy())
         edit_menu.addAction(copy_action)
         
         paste_action = QAction("&Paste", self)
         paste_action.setShortcut(QKeySequence.StandardKey.Paste)
-        paste_action.triggered.connect(self.editor.paste)
+        paste_action.triggered.connect(lambda: self.get_current_editor() and self.get_current_editor().paste())
         edit_menu.addAction(paste_action)
         
         edit_menu.addSeparator()
@@ -218,6 +223,11 @@ class MainWindow(QMainWindow):
         toggle_output_action.triggered.connect(self.toggle_output_panel)
         view_menu.addAction(toggle_output_action)
         
+        toggle_validation_action = QAction("Toggle &Validation Panel", self)
+        toggle_validation_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        toggle_validation_action.triggered.connect(self.toggle_validation_panel)
+        view_menu.addAction(toggle_validation_action)
+        
         view_menu.addSeparator()
         
         word_wrap_action = QAction("Word &Wrap", self)
@@ -256,11 +266,11 @@ class MainWindow(QMainWindow):
         
         # Edit actions
         undo_action = QAction("Undo", self)
-        undo_action.triggered.connect(self.editor.undo)
+        undo_action.triggered.connect(lambda: self.get_current_editor() and self.get_current_editor().undo())
         toolbar.addAction(undo_action)
         
         redo_action = QAction("Redo", self)
-        redo_action.triggered.connect(self.editor.redo)
+        redo_action.triggered.connect(lambda: self.get_current_editor() and self.get_current_editor().redo())
         toolbar.addAction(redo_action)
         
         toolbar.addSeparator()
@@ -292,23 +302,157 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.output_dock)
         self.output_dock.hide()
         
+    def create_validation_panel(self):
+        """Create persistent validation panel."""
+        self.validation_dock = QDockWidget("Validation", self)
+        validation_widget = QWidget()
+        validation_layout = QVBoxLayout(validation_widget)
+        
+        # Validation type selector and buttons
+        button_layout = QHBoxLayout()
+        
+        self.validate_well_formed_btn = QPushButton("Well-Formed")
+        self.validate_well_formed_btn.clicked.connect(self.validate_well_formed)
+        button_layout.addWidget(self.validate_well_formed_btn)
+        
+        self.validate_xsd_btn = QPushButton("Validate XSD")
+        self.validate_xsd_btn.clicked.connect(self.validate_with_xsd)
+        button_layout.addWidget(self.validate_xsd_btn)
+        
+        self.validate_dtd_btn = QPushButton("Validate DTD")
+        self.validate_dtd_btn.clicked.connect(self.validate_with_dtd)
+        button_layout.addWidget(self.validate_dtd_btn)
+        
+        button_layout.addStretch()
+        validation_layout.addLayout(button_layout)
+        
+        # Schema input area
+        schema_label = QLabel("Schema/DTD Content:")
+        validation_layout.addWidget(schema_label)
+        
+        self.validation_schema_input = QTextEdit()
+        self.validation_schema_input.setPlaceholderText("Paste XSD schema or DTD here, or load from file...")
+        self.validation_schema_input.setMaximumHeight(150)
+        validation_layout.addWidget(self.validation_schema_input)
+        
+        schema_file_layout = QHBoxLayout()
+        load_schema_btn = QPushButton("Load Schema File")
+        load_schema_btn.clicked.connect(self.load_schema_file)
+        schema_file_layout.addWidget(load_schema_btn)
+        schema_file_layout.addStretch()
+        validation_layout.addLayout(schema_file_layout)
+        
+        # Validation result area
+        result_label = QLabel("Validation Result:")
+        validation_layout.addWidget(result_label)
+        
+        self.validation_result = QTextEdit()
+        self.validation_result.setReadOnly(True)
+        validation_layout.addWidget(self.validation_result)
+        
+        self.validation_dock.setWidget(validation_widget)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.validation_dock)
+        self.validation_dock.hide()
+    
+    def get_current_editor(self):
+        """Get the currently active editor widget."""
+        current_index = self.tab_widget.currentIndex()
+        if current_index >= 0:
+            return self.tab_widget.widget(current_index)
+        return None
+    
+    def get_current_tab_data(self):
+        """Get data for the current tab."""
+        current_index = self.tab_widget.currentIndex()
+        if current_index >= 0 and current_index in self.tab_data:
+            return self.tab_data[current_index]
+        return None
+    
+    def set_current_tab_data(self, data):
+        """Set data for the current tab."""
+        current_index = self.tab_widget.currentIndex()
+        if current_index >= 0:
+            self.tab_data[current_index] = data
+    
+    def on_tab_changed(self, index):
+        """Handle tab change event."""
+        if index >= 0:
+            self.refresh_tree_view()
+            self.update_window_title()
+    
+    def close_tab(self, index):
+        """Close a tab."""
+        if index < 0 or index >= self.tab_widget.count():
+            return
+        
+        # Check if tab has unsaved changes
+        tab_data = self.tab_data.get(index, {})
+        if tab_data.get('is_modified', False):
+            editor = self.tab_widget.widget(index)
+            file_name = os.path.basename(tab_data.get('file_path', 'Untitled'))
+            
+            reply = QMessageBox.question(
+                self, "Unsaved Changes",
+                f"Do you want to save changes to {file_name}?",
+                QMessageBox.StandardButton.Save | 
+                QMessageBox.StandardButton.Discard | 
+                QMessageBox.StandardButton.Cancel
+            )
+            
+            if reply == QMessageBox.StandardButton.Save:
+                current_index = self.tab_widget.currentIndex()
+                self.tab_widget.setCurrentIndex(index)
+                self.save_file()
+                self.tab_widget.setCurrentIndex(current_index)
+            elif reply == QMessageBox.StandardButton.Cancel:
+                return
+        
+        # Remove tab
+        self.tab_widget.removeTab(index)
+        
+        # Update tab_data dictionary (shift indices)
+        new_tab_data = {}
+        for i, data in self.tab_data.items():
+            if i < index:
+                new_tab_data[i] = data
+            elif i > index:
+                new_tab_data[i - 1] = data
+        self.tab_data = new_tab_data
+        
+        # If no tabs left, create a new one
+        if self.tab_widget.count() == 0:
+            self.create_new_document()
+    
+    def create_editor_tab(self, title="Untitled", content="", file_path=None):
+        """Create a new editor tab."""
+        editor = XMLEditor()
+        editor.textChanged.connect(self.on_text_changed)
+        if content:
+            editor.set_text(content)
+        
+        index = self.tab_widget.addTab(editor, title)
+        self.tab_widget.setCurrentIndex(index)
+        
+        self.tab_data[index] = {
+            'file_path': file_path,
+            'is_modified': False
+        }
+        
+        self.update_window_title()
+        return editor
+        
     def create_new_document(self):
         """Create a new XML document."""
-        if self.check_save_changes():
-            self.editor.clear_content()
-            self.editor.set_text('<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    \n</root>')
-            self.current_file = None
-            self.is_modified = False
-            self.update_window_title()
-            self.tree_view.clear()
+        editor = self.create_editor_tab(
+            title="Untitled",
+            content='<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    \n</root>'
+        )
+        self.tree_view.clear()
             
     def open_file(self):
         """Open an XML file."""
-        if not self.check_save_changes():
-            return
-        
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Open XML File", "", "XML Files (*.xml);;All Files (*)"
+            self, "Open XML File", "", "XML Files (*.xml *.xsd *.dtd);;All Files (*)"
         )
         
         if file_path:
@@ -320,10 +464,22 @@ class MainWindow(QMainWindow):
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            self.editor.set_text(content)
-            self.current_file = file_path
-            self.is_modified = False
-            self.update_window_title()
+            # Check if file is already open in a tab
+            for index in range(self.tab_widget.count()):
+                tab_data = self.tab_data.get(index, {})
+                if tab_data.get('file_path') == file_path:
+                    self.tab_widget.setCurrentIndex(index)
+                    QMessageBox.information(self, "File Already Open", 
+                                          f"The file {os.path.basename(file_path)} is already open.")
+                    return
+            
+            # Create new tab for the file
+            self.create_editor_tab(
+                title=os.path.basename(file_path),
+                content=content,
+                file_path=file_path
+            )
+            
             self.add_recent_file(file_path)
             self.refresh_tree_view()
             self.output_panel.clear()
@@ -333,15 +489,16 @@ class MainWindow(QMainWindow):
             
     def save_file(self):
         """Save the current file."""
-        if self.current_file:
-            self.save_to_file(self.current_file)
+        tab_data = self.get_current_tab_data()
+        if tab_data and tab_data.get('file_path'):
+            self.save_to_file(tab_data['file_path'])
         else:
             self.save_file_as()
             
     def save_file_as(self):
         """Save the current file with a new name."""
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save XML File", "", "XML Files (*.xml);;All Files (*)"
+            self, "Save XML File", "", "XML Files (*.xml);;XSD Files (*.xsd);;DTD Files (*.dtd);;All Files (*)"
         )
         
         if file_path:
@@ -349,12 +506,23 @@ class MainWindow(QMainWindow):
             
     def save_to_file(self, file_path):
         """Save content to file."""
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(self.editor.get_text())
+                f.write(editor.get_text())
             
-            self.current_file = file_path
-            self.is_modified = False
+            current_index = self.tab_widget.currentIndex()
+            self.tab_data[current_index] = {
+                'file_path': file_path,
+                'is_modified': False
+            }
+            
+            # Update tab title
+            self.tab_widget.setTabText(current_index, os.path.basename(file_path))
+            
             self.update_window_title()
             self.add_recent_file(file_path)
             self.statusBar().showMessage(f"Saved: {file_path}")
@@ -363,7 +531,11 @@ class MainWindow(QMainWindow):
             
     def format_xml(self):
         """Format the XML content."""
-        content = self.editor.get_text().strip()
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
+        content = editor.get_text().strip()
         
         if not content:
             QMessageBox.warning(self, "Warning", "No content to format")
@@ -371,7 +543,7 @@ class MainWindow(QMainWindow):
         
         try:
             formatted = XMLUtilities.format_xml(content)
-            self.editor.set_text(formatted)
+            editor.set_text(formatted)
             self.statusBar().showMessage("XML formatted successfully")
             self.refresh_tree_view()
         except Exception as e:
@@ -380,19 +552,121 @@ class MainWindow(QMainWindow):
             self.output_dock.show()
             
     def validate_xml(self):
-        """Open validation dialog."""
-        content = self.editor.get_text().strip()
+        """Open validation dialog or show validation panel."""
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
+        content = editor.get_text().strip()
         
         if not content:
             QMessageBox.warning(self, "Warning", "No content to validate")
             return
         
-        dialog = ValidationDialog(content, self)
-        dialog.exec()
+        # Show validation panel and perform well-formed check
+        self.validation_dock.show()
+        self.validate_well_formed()
+    
+    def validate_well_formed(self):
+        """Validate XML well-formedness in the validation panel."""
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
+        content = editor.get_text().strip()
+        if not content:
+            self.validation_result.setPlainText("No content to validate")
+            return
+        
+        is_valid, message = XMLUtilities.validate_xml(content)
+        
+        if is_valid:
+            self.validation_result.setStyleSheet("color: green;")
+            self.validation_result.setPlainText(f"✓ {message}")
+        else:
+            self.validation_result.setStyleSheet("color: red;")
+            self.validation_result.setPlainText(f"✗ {message}")
+    
+    def validate_with_xsd(self):
+        """Validate XML against XSD schema in the validation panel."""
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
+        content = editor.get_text().strip()
+        xsd_content = self.validation_schema_input.toPlainText().strip()
+        
+        if not content:
+            self.validation_result.setPlainText("No XML content to validate")
+            return
+        
+        if not xsd_content:
+            QMessageBox.warning(self, "Warning", "Please provide an XSD schema")
+            return
+        
+        try:
+            is_valid, message = XMLUtilities.validate_with_xsd(content, xsd_content)
+            
+            if is_valid:
+                self.validation_result.setStyleSheet("color: green;")
+                self.validation_result.setPlainText(f"✓ {message}")
+            else:
+                self.validation_result.setStyleSheet("color: red;")
+                self.validation_result.setPlainText(f"✗ {message}")
+        except Exception as e:
+            self.validation_result.setStyleSheet("color: red;")
+            self.validation_result.setPlainText(f"✗ Error: {str(e)}")
+    
+    def validate_with_dtd(self):
+        """Validate XML against DTD in the validation panel."""
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
+        content = editor.get_text().strip()
+        dtd_content = self.validation_schema_input.toPlainText().strip()
+        
+        if not content:
+            self.validation_result.setPlainText("No XML content to validate")
+            return
+        
+        if not dtd_content:
+            QMessageBox.warning(self, "Warning", "Please provide a DTD")
+            return
+        
+        try:
+            is_valid, message = XMLUtilities.validate_with_dtd(content, dtd_content)
+            
+            if is_valid:
+                self.validation_result.setStyleSheet("color: green;")
+                self.validation_result.setPlainText(f"✓ {message}")
+            else:
+                self.validation_result.setStyleSheet("color: red;")
+                self.validation_result.setPlainText(f"✗ {message}")
+        except Exception as e:
+            self.validation_result.setStyleSheet("color: red;")
+            self.validation_result.setPlainText(f"✗ Error: {str(e)}")
+    
+    def load_schema_file(self):
+        """Load schema or DTD file for validation."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open Schema/DTD", "", "Schema Files (*.xsd *.dtd);;All Files (*)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    self.validation_schema_input.setPlainText(f.read())
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load file:\n{str(e)}")
         
     def show_xpath_dialog(self):
         """Open XPath query dialog."""
-        content = self.editor.get_text().strip()
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
+        content = editor.get_text().strip()
         
         if not content:
             QMessageBox.warning(self, "Warning", "No content to query")
@@ -403,7 +677,11 @@ class MainWindow(QMainWindow):
         
     def show_xslt_dialog(self):
         """Open XSLT transformation dialog."""
-        content = self.editor.get_text().strip()
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
+        content = editor.get_text().strip()
         
         if not content:
             QMessageBox.warning(self, "Warning", "No content to transform")
@@ -413,12 +691,17 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             transformed = dialog.get_transformed_xml()
             if transformed:
-                self.editor.set_text(transformed)
+                editor.set_text(transformed)
                 self.refresh_tree_view()
                 
     def refresh_tree_view(self):
         """Refresh the XML tree view."""
-        content = self.editor.get_text().strip()
+        editor = self.get_current_editor()
+        if not editor:
+            self.tree_view.clear()
+            return
+        
+        content = editor.get_text().strip()
         
         if content:
             try:
@@ -433,13 +716,21 @@ class MainWindow(QMainWindow):
             
     def find_text(self):
         """Find text in editor."""
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
         text, ok = QInputDialog.getText(self, "Find", "Find text:")
         if ok and text:
-            if not self.editor.findFirst(text, False, True, False, True):
+            if not editor.findFirst(text, False, True, False, True):
                 QMessageBox.information(self, "Find", f"'{text}' not found")
                 
     def replace_text(self):
         """Replace text in editor."""
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
         find_text, ok = QInputDialog.getText(self, "Replace", "Find text:")
         if not ok or not find_text:
             return
@@ -448,11 +739,11 @@ class MainWindow(QMainWindow):
         if not ok:
             return
         
-        content = self.editor.get_text()
+        content = editor.get_text()
         new_content = content.replace(find_text, replace_text)
         
         if content != new_content:
-            self.editor.set_text(new_content)
+            editor.set_text(new_content)
             count = content.count(find_text)
             QMessageBox.information(self, "Replace", f"Replaced {count} occurrence(s)")
         else:
@@ -460,24 +751,28 @@ class MainWindow(QMainWindow):
             
     def toggle_comment(self):
         """Toggle XML comment for selected text."""
+        editor = self.get_current_editor()
+        if not editor:
+            return
+        
         # Get selected text
-        if self.editor.hasSelectedText():
-            start_line, start_pos, end_line, end_pos = self.editor.getSelection()
-            selected_text = self.editor.selectedText()
+        if editor.hasSelectedText():
+            start_line, start_pos, end_line, end_pos = editor.getSelection()
+            selected_text = editor.selectedText()
             
             # Check if already commented
             if selected_text.strip().startswith('<!--') and selected_text.strip().endswith('-->'):
                 # Uncomment
                 new_text = selected_text.replace('<!--', '', 1).rsplit('-->', 1)[0]
-                self.editor.replaceSelectedText(new_text)
+                editor.replaceSelectedText(new_text)
             else:
                 # Comment
                 new_text = f"<!-- {selected_text} -->"
-                self.editor.replaceSelectedText(new_text)
+                editor.replaceSelectedText(new_text)
         else:
             # Comment current line
-            line, pos = self.editor.getCursorPosition()
-            line_text = self.editor.text(line)
+            line, pos = editor.getCursorPosition()
+            line_text = editor.text(line)
             
             if '<!--' in line_text and '-->' in line_text:
                 # Uncomment
@@ -486,8 +781,8 @@ class MainWindow(QMainWindow):
                 # Comment
                 new_text = f"<!-- {line_text.strip()} -->"
             
-            self.editor.setSelection(line, 0, line, len(line_text))
-            self.editor.replaceSelectedText(new_text)
+            editor.setSelection(line, 0, line, len(line_text))
+            editor.replaceSelectedText(new_text)
             
     def toggle_tree_view(self):
         """Toggle tree view visibility."""
@@ -503,51 +798,72 @@ class MainWindow(QMainWindow):
             self.output_dock.hide()
         else:
             self.output_dock.show()
+    
+    def toggle_validation_panel(self):
+        """Toggle validation panel visibility."""
+        if self.validation_dock.isVisible():
+            self.validation_dock.hide()
+        else:
+            self.validation_dock.show()
             
     def toggle_word_wrap(self, checked):
         """Toggle word wrap in editor."""
-        if checked:
-            self.editor.setWrapMode(QsciScintilla.WrapMode.WrapWord)
-        else:
-            self.editor.setWrapMode(QsciScintilla.WrapMode.WrapNone)
+        from PyQt6.Qsci import QsciScintilla
+        editor = self.get_current_editor()
+        if editor:
+            if checked:
+                editor.setWrapMode(QsciScintilla.WrapMode.WrapWord)
+            else:
+                editor.setWrapMode(QsciScintilla.WrapMode.WrapNone)
             
     def on_text_changed(self):
         """Handle text changed event."""
-        self.is_modified = True
-        self.update_window_title()
+        current_index = self.tab_widget.currentIndex()
+        if current_index >= 0:
+            tab_data = self.tab_data.get(current_index, {})
+            tab_data['is_modified'] = True
+            self.tab_data[current_index] = tab_data
+            self.update_window_title()
         
     def update_window_title(self):
         """Update window title based on current file and modified state."""
         title = "XML Editor"
         
-        if self.current_file:
-            title += f" - {os.path.basename(self.current_file)}"
-        else:
-            title += " - Untitled"
-        
-        if self.is_modified:
-            title += " *"
+        tab_data = self.get_current_tab_data()
+        if tab_data:
+            file_path = tab_data.get('file_path')
+            is_modified = tab_data.get('is_modified', False)
+            
+            if file_path:
+                title += f" - {os.path.basename(file_path)}"
+            else:
+                title += " - Untitled"
+            
+            if is_modified:
+                title += " *"
         
         self.setWindowTitle(title)
         
     def check_save_changes(self):
-        """Check if there are unsaved changes and prompt user."""
-        if self.is_modified:
-            reply = QMessageBox.question(
-                self, "Unsaved Changes",
-                "Do you want to save your changes?",
-                QMessageBox.StandardButton.Save | 
-                QMessageBox.StandardButton.Discard | 
-                QMessageBox.StandardButton.Cancel
-            )
-            
-            if reply == QMessageBox.StandardButton.Save:
-                self.save_file()
-                return True
-            elif reply == QMessageBox.StandardButton.Discard:
-                return True
-            else:
-                return False
+        """Check if there are unsaved changes in any tab and prompt user."""
+        for index in range(self.tab_widget.count()):
+            tab_data = self.tab_data.get(index, {})
+            if tab_data.get('is_modified', False):
+                file_name = os.path.basename(tab_data.get('file_path', 'Untitled'))
+                
+                reply = QMessageBox.question(
+                    self, "Unsaved Changes",
+                    f"Do you want to save changes to {file_name}?",
+                    QMessageBox.StandardButton.Save | 
+                    QMessageBox.StandardButton.Discard | 
+                    QMessageBox.StandardButton.Cancel
+                )
+                
+                if reply == QMessageBox.StandardButton.Save:
+                    self.tab_widget.setCurrentIndex(index)
+                    self.save_file()
+                elif reply == QMessageBox.StandardButton.Cancel:
+                    return False
         
         return True
         
