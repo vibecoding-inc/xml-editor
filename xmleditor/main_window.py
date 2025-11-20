@@ -40,9 +40,19 @@ class MainWindow(QMainWindow):
         self.tree_refresh_timer.setSingleShot(True)
         self.tree_refresh_timer.timeout.connect(self.auto_refresh_tree_view)
         
+        # Create timer for auto-save
+        self.auto_save_timer = QTimer()
+        self.auto_save_timer.timeout.connect(self.perform_auto_save)
+        self.auto_save_enabled = self.settings.value("auto_save_enabled", False, type=bool)
+        self.auto_save_interval = self.settings.value("auto_save_interval", 30, type=int)  # seconds
+        
         self.tab_data = {}  # Map tab index to {file_path, is_modified}
         self.init_ui()
         self.create_new_document()
+        
+        # Start auto-save timer if enabled
+        if self.auto_save_enabled:
+            self.auto_save_timer.start(self.auto_save_interval * 1000)  # Convert to milliseconds
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -130,6 +140,16 @@ class MainWindow(QMainWindow):
         save_as_action.setStatusTip("Save the current document with a new name")
         save_as_action.triggered.connect(self.save_file_as)
         file_menu.addAction(save_as_action)
+        
+        file_menu.addSeparator()
+        
+        # Auto-save checkbox
+        self.auto_save_action = QAction("Auto Save", self)
+        self.auto_save_action.setCheckable(True)
+        self.auto_save_action.setChecked(self.auto_save_enabled)
+        self.auto_save_action.setStatusTip("Automatically save files every 30 seconds")
+        self.auto_save_action.triggered.connect(self.toggle_auto_save)
+        file_menu.addAction(self.auto_save_action)
         
         file_menu.addSeparator()
         
@@ -572,6 +592,52 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Saved: {file_path}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save file:\n{str(e)}")
+    
+    def toggle_auto_save(self, checked):
+        """Toggle auto-save feature."""
+        self.auto_save_enabled = checked
+        self.settings.setValue("auto_save_enabled", checked)
+        
+        if checked:
+            self.auto_save_timer.start(self.auto_save_interval * 1000)
+            self.statusBar().showMessage(f"Auto-save enabled (every {self.auto_save_interval} seconds)")
+        else:
+            self.auto_save_timer.stop()
+            self.statusBar().showMessage("Auto-save disabled")
+    
+    def perform_auto_save(self):
+        """Perform auto-save for all modified tabs with file paths."""
+        saved_count = 0
+        
+        for index in range(self.tab_widget.count()):
+            tab_data = self.tab_data.get(index, {})
+            file_path = tab_data.get('file_path')
+            is_modified = tab_data.get('is_modified', False)
+            
+            # Only auto-save files that have a path (not "Untitled" documents) and are modified
+            if file_path and is_modified:
+                editor = self.tab_widget.widget(index)
+                if editor:
+                    try:
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write(editor.get_text())
+                        
+                        # Mark as not modified after successful save
+                        self.tab_data[index]['is_modified'] = False
+                        saved_count += 1
+                    except Exception as e:
+                        # Silently log errors during auto-save to avoid disrupting user
+                        print(f"Auto-save failed for {file_path}: {str(e)}")
+        
+        # Update window title for current tab
+        if saved_count > 0:
+            self.update_window_title()
+            # Show brief status message
+            if saved_count == 1:
+                self.statusBar().showMessage("Auto-saved 1 file", 2000)
+            else:
+                self.statusBar().showMessage(f"Auto-saved {saved_count} files", 2000)
+            
             
     def format_xml(self):
         """Format the XML content."""
