@@ -180,9 +180,6 @@ class XMLEditor(QsciScintilla):
             # Keep the font for all styles
             self.lexer.setFont(self.font, style_num)
         
-        # Apply initial theme
-        self.apply_theme(theme_type)
-        
     def get_text(self):
         """Get the text content of the editor."""
         return self.text()

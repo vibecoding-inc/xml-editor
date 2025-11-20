@@ -63,6 +63,8 @@ class MainWindow(QMainWindow):
         self.tab_widget.setMovable(True)
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.tab_widget)
         
         # Create tree view
@@ -285,6 +287,7 @@ class MainWindow(QMainWindow):
     def create_toolbar(self):
         """Create application toolbar."""
         toolbar = QToolBar("Main Toolbar")
+        toolbar.setObjectName("MainToolbar")
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
         
@@ -334,6 +337,7 @@ class MainWindow(QMainWindow):
     def create_output_panel(self):
         """Create output/error panel."""
         self.output_dock = QDockWidget("Output", self)
+        self.output_dock.setObjectName("OutputDock")
         self.output_panel = QTextEdit()
         self.output_panel.setReadOnly(True)
         self.output_panel.setMaximumHeight(150)
@@ -344,6 +348,7 @@ class MainWindow(QMainWindow):
     def create_validation_panel(self):
         """Create persistent validation panel."""
         self.validation_dock = QDockWidget("Validation", self)
+        self.validation_dock.setObjectName("ValidationDock")
         validation_widget = QWidget()
         validation_layout = QVBoxLayout(validation_widget)
         
