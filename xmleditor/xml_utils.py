@@ -204,12 +204,13 @@ class XMLUtilities:
             raise ValueError(f"XSLT transformation error: {str(e)}")
     
     @staticmethod
-    def get_xml_tree_structure(xml_string: str) -> List[dict]:
+    def get_xml_tree_structure(xml_string: str, show_namespaces: bool = False) -> List[dict]:
         """
         Get XML tree structure for tree view.
         
         Args:
             xml_string: XML content as string
+            show_namespaces: Whether to show namespace prefixes in tag names
             
         Returns:
             List of dictionaries representing tree nodes
@@ -218,8 +219,29 @@ class XMLUtilities:
             tree = etree.fromstring(xml_string.encode('utf-8'))
             
             def element_to_dict(element):
+                # Extract tag name, handling namespaces
+                tag = element.tag
+                if isinstance(tag, str):
+                    # Handle namespace - extract local name or prefix
+                    if tag.startswith('{'):
+                        # Tag has namespace URI like {http://...}localname
+                        ns_uri, local_name = tag[1:].split('}', 1)
+                        if show_namespaces:
+                            # Find the prefix for this namespace
+                            prefix = None
+                            for p, uri in element.nsmap.items():
+                                if uri == ns_uri:
+                                    prefix = p
+                                    break
+                            # Use prefix:localname or just localname if no prefix
+                            tag = f"{prefix}:{local_name}" if prefix else local_name
+                        else:
+                            # Just use local name without namespace
+                            tag = local_name
+                    # else: tag has no namespace, use as-is
+                
                 node = {
-                    'tag': element.tag,
+                    'tag': tag,
                     'text': element.text.strip() if element.text and element.text.strip() else '',
                     'attributes': dict(element.attrib),
                     'children': []

@@ -17,17 +17,18 @@ class XMLTreeView(QTreeWidget):
         self.setColumnWidth(1, 150)
         self.setAlternatingRowColors(True)
         
-    def load_xml(self, xml_content: str):
+    def load_xml(self, xml_content: str, show_namespaces: bool = False):
         """
         Load XML content into tree view.
         
         Args:
             xml_content: XML string to display
+            show_namespaces: Whether to show namespace prefixes in tag names
         """
         self.clear()
         
         try:
-            tree_structure = XMLUtilities.get_xml_tree_structure(xml_content)
+            tree_structure = XMLUtilities.get_xml_tree_structure(xml_content, show_namespaces)
             
             for node in tree_structure:
                 self.add_node(None, node)
