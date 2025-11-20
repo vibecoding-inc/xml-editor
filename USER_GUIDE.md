@@ -260,12 +260,24 @@ Select text and press Ctrl+Shift+F to format selection.
 Use the XPath dialog to test expressions before using them in code.
 
 ### Schema Validation Workflow
+
+#### Option 1: Text Input (Quick Validation)
 1. Open XML file
-2. Open validation dialog
-3. Load XSD schema
-4. Keep dialog open
-5. Edit XML in main window
-6. Re-validate after changes
+2. Open validation panel (View → Validation or Ctrl+Shift+V)
+3. Select "Text Input" tab
+4. Paste schema or click "Load from File" to load once
+5. Click "Validate XSD" or "Validate DTD"
+
+#### Option 2: File Path (Auto-Reload)
+1. Open XML file
+2. Open validation panel (View → Validation or Ctrl+Shift+V)
+3. Select "File Path" tab
+4. Click "Browse..." and select schema file
+5. Click "Validate XSD" or "Validate DTD"
+6. Edit schema in another tab/editor
+7. Click validate again - schema automatically reloads from disk
+
+**Use Case for File Path Tab**: Perfect when editing both XML and schema files simultaneously. The schema is reloaded fresh from disk on each validation, so you can see validation results update as you modify the schema without manually reloading.
 
 ### XSLT Development
 1. Keep XSLT dialog open

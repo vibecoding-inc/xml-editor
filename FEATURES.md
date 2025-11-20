@@ -56,7 +56,13 @@
 - **Real-time Feedback**: Visual indication of validity
 
 #### XSD Schema Validation
-- **Load Schema**: From file or paste directly
+- **Dual Input Methods**:
+  - **Text Input Tab**: Paste schema directly or load once from file
+  - **File Path Tab**: Select schema file with automatic reload on each validation
+- **Auto-Reload Feature**: Schema file is reloaded from disk on every validation
+  - Perfect for editing schemas and validating XML simultaneously
+  - No need to manually reload when schema changes
+  - Works seamlessly with multi-tab editing
 - **Detailed Validation**: Element and attribute checking
 - **Error Details**: Line numbers and specific violations
 - **Schema Support**:
@@ -70,6 +76,10 @@
   - Extensions
 
 #### DTD Validation
+- **Dual Input Methods**:
+  - **Text Input Tab**: Paste DTD directly or load once from file
+  - **File Path Tab**: Select DTD file with automatic reload on each validation
+- **Auto-Reload Feature**: DTD file is reloaded from disk on every validation
 - **DTD Support**: Validate against Document Type Definitions
 - **External DTD**: Load DTD from file
 - **Internal DTD**: Support for embedded DTD
