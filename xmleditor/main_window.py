@@ -370,21 +370,67 @@ class MainWindow(QMainWindow):
         button_layout.addStretch()
         validation_layout.addLayout(button_layout)
         
-        # Schema input area
-        schema_label = QLabel("Schema/DTD Content:")
+        # Schema input area with tabs
+        schema_label = QLabel("Schema/DTD Source:")
         validation_layout.addWidget(schema_label)
         
-        self.validation_schema_input = QTextEdit()
-        self.validation_schema_input.setPlaceholderText("Paste XSD schema or DTD here, or load from file...")
-        self.validation_schema_input.setMaximumHeight(150)
-        validation_layout.addWidget(self.validation_schema_input)
+        # Create tab widget for schema input methods
+        self.schema_input_tabs = QTabWidget()
         
-        schema_file_layout = QHBoxLayout()
-        load_schema_btn = QPushButton("Load Schema File")
+        # Tab 1: Text input
+        text_input_widget = QWidget()
+        text_input_layout = QVBoxLayout(text_input_widget)
+        
+        self.validation_schema_input = QTextEdit()
+        self.validation_schema_input.setPlaceholderText("Paste XSD schema or DTD here...")
+        self.validation_schema_input.setMaximumHeight(120)
+        text_input_layout.addWidget(self.validation_schema_input)
+        
+        text_file_layout = QHBoxLayout()
+        load_schema_btn = QPushButton("Load from File")
         load_schema_btn.clicked.connect(self.load_schema_file)
-        schema_file_layout.addWidget(load_schema_btn)
-        schema_file_layout.addStretch()
-        validation_layout.addLayout(schema_file_layout)
+        text_file_layout.addWidget(load_schema_btn)
+        text_file_layout.addStretch()
+        text_input_layout.addLayout(text_file_layout)
+        
+        self.schema_input_tabs.addTab(text_input_widget, "Text Input")
+        
+        # Tab 2: File picker
+        file_picker_widget = QWidget()
+        file_picker_layout = QVBoxLayout(file_picker_widget)
+        
+        # File path display and picker
+        file_path_layout = QHBoxLayout()
+        file_path_layout.addWidget(QLabel("Schema File:"))
+        
+        self.schema_file_path_label = QLabel("No file selected")
+        self.schema_file_path_label.setStyleSheet("color: gray; font-style: italic;")
+        file_path_layout.addWidget(self.schema_file_path_label, 1)
+        
+        select_file_btn = QPushButton("Browse...")
+        select_file_btn.clicked.connect(self.select_schema_file)
+        file_path_layout.addWidget(select_file_btn)
+        
+        clear_file_btn = QPushButton("Clear")
+        clear_file_btn.clicked.connect(self.clear_schema_file)
+        file_path_layout.addWidget(clear_file_btn)
+        
+        file_picker_layout.addLayout(file_path_layout)
+        
+        # Info label
+        info_label = QLabel("The schema file will be reloaded from disk each time validation is performed.")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: gray; font-size: 10px;")
+        file_picker_layout.addWidget(info_label)
+        
+        file_picker_layout.addStretch()
+        
+        self.schema_input_tabs.addTab(file_picker_widget, "File Path")
+        
+        validation_layout.addWidget(self.schema_input_tabs)
+        
+        # Store schema file path
+        self.schema_file_path = None
         
         # Validation result area
         result_label = QLabel("Validation Result:")
@@ -649,15 +695,33 @@ class MainWindow(QMainWindow):
             return
         
         content = editor.get_text().strip()
-        xsd_content = self.validation_schema_input.toPlainText().strip()
         
         if not content:
             self.validation_result.setPlainText("No XML content to validate")
             return
         
-        if not xsd_content:
-            QMessageBox.warning(self, "Warning", "Please provide an XSD schema")
-            return
+        # Get schema content based on active tab
+        xsd_content = None
+        
+        if self.schema_input_tabs.currentIndex() == 0:
+            # Text input tab
+            xsd_content = self.validation_schema_input.toPlainText().strip()
+            if not xsd_content:
+                QMessageBox.warning(self, "Warning", "Please provide an XSD schema in the text field")
+                return
+        else:
+            # File path tab - reload from file each time
+            if not self.schema_file_path:
+                QMessageBox.warning(self, "Warning", "Please select a schema file")
+                return
+            
+            try:
+                with open(self.schema_file_path, 'r', encoding='utf-8') as f:
+                    xsd_content = f.read()
+            except Exception as e:
+                self.validation_result.setStyleSheet("color: red;")
+                self.validation_result.setPlainText(f"✗ Error loading schema file:\n{str(e)}")
+                return
         
         try:
             is_valid, message = XMLUtilities.validate_with_xsd(content, xsd_content)
@@ -679,15 +743,33 @@ class MainWindow(QMainWindow):
             return
         
         content = editor.get_text().strip()
-        dtd_content = self.validation_schema_input.toPlainText().strip()
         
         if not content:
             self.validation_result.setPlainText("No XML content to validate")
             return
         
-        if not dtd_content:
-            QMessageBox.warning(self, "Warning", "Please provide a DTD")
-            return
+        # Get DTD content based on active tab
+        dtd_content = None
+        
+        if self.schema_input_tabs.currentIndex() == 0:
+            # Text input tab
+            dtd_content = self.validation_schema_input.toPlainText().strip()
+            if not dtd_content:
+                QMessageBox.warning(self, "Warning", "Please provide a DTD in the text field")
+                return
+        else:
+            # File path tab - reload from file each time
+            if not self.schema_file_path:
+                QMessageBox.warning(self, "Warning", "Please select a DTD file")
+                return
+            
+            try:
+                with open(self.schema_file_path, 'r', encoding='utf-8') as f:
+                    dtd_content = f.read()
+            except Exception as e:
+                self.validation_result.setStyleSheet("color: red;")
+                self.validation_result.setPlainText(f"✗ Error loading DTD file:\n{str(e)}")
+                return
         
         try:
             is_valid, message = XMLUtilities.validate_with_dtd(content, dtd_content)
@@ -703,7 +785,7 @@ class MainWindow(QMainWindow):
             self.validation_result.setPlainText(f"✗ Error: {str(e)}")
     
     def load_schema_file(self):
-        """Load schema or DTD file for validation."""
+        """Load schema or DTD file for validation (text input tab)."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Open Schema/DTD", "", "Schema Files (*.xsd *.dtd);;All Files (*)"
         )
@@ -714,6 +796,26 @@ class MainWindow(QMainWindow):
                     self.validation_schema_input.setPlainText(f.read())
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load file:\n{str(e)}")
+    
+    def select_schema_file(self):
+        """Select schema file for validation (file path tab)."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Schema/DTD File", "", "Schema Files (*.xsd *.dtd);;All Files (*)"
+        )
+        
+        if file_path:
+            self.schema_file_path = file_path
+            # Display just the filename with full path as tooltip
+            self.schema_file_path_label.setText(os.path.basename(file_path))
+            self.schema_file_path_label.setToolTip(file_path)
+            self.schema_file_path_label.setStyleSheet("color: black; font-style: normal;")
+    
+    def clear_schema_file(self):
+        """Clear the selected schema file path."""
+        self.schema_file_path = None
+        self.schema_file_path_label.setText("No file selected")
+        self.schema_file_path_label.setToolTip("")
+        self.schema_file_path_label.setStyleSheet("color: gray; font-style: italic;")
         
     def show_xpath_dialog(self):
         """Open XPath query dialog."""
