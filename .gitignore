@@ -136,3 +136,8 @@ Thumbs.db
 # Application specific
 *.xml~
 *.bak
+
+# Nix
+result
+result-*
+.direnv/

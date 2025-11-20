@@ -56,6 +56,25 @@ pip install .
 pip install xml-editor
 ```
 
+### Install with Nix (Recommended for NixOS users)
+
+**Using Nix Flakes:**
+```bash
+# Run directly
+nix run github:profiluefter/xml-editor
+
+# Install
+nix profile install github:profiluefter/xml-editor
+```
+
+**Traditional Nix:**
+```bash
+nix-build
+nix-env -f default.nix -i
+```
+
+See [NIX.md](NIX.md) for detailed Nix packaging information, including CLI variant and development setup.
+
 ## Usage
 
 ### Running the application

@@ -40,7 +40,47 @@ pip install xml-editor
    pip install .
    ```
 
-### Method 3: Install in Development Mode
+### Method 3: Install with Nix (NixOS/Nix users)
+
+**Recommended for NixOS users for reproducible builds.**
+
+Using Nix Flakes (recommended):
+
+1. **Run directly without installing:**
+   ```bash
+   nix run github:profiluefter/xml-editor
+   ```
+
+2. **Install to user profile:**
+   ```bash
+   nix profile install github:profiluefter/xml-editor
+   ```
+
+3. **Install CLI variant:**
+   ```bash
+   nix profile install github:profiluefter/xml-editor#cli
+   ```
+
+Using traditional Nix:
+
+```bash
+# Build
+nix-build
+
+# Install
+nix-env -f default.nix -i
+
+# Or for CLI variant
+nix-build default.nix --arg gui false
+```
+
+See [NIX.md](NIX.md) for comprehensive Nix documentation including:
+- Development environment setup
+- Testing with Nix
+- Integration with NixOS/home-manager
+- Both GUI and CLI package variants
+
+### Method 4: Install in Development Mode
 
 For developers who want to modify the code:
 
