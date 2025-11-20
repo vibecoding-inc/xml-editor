@@ -13,6 +13,7 @@ A fully-featured cross-platform XML editor desktop application built with Python
 - **XML Validation**: Check well-formedness and validate against schemas
 - **XML Schema (XSD) Support**: Full XSD validation with detailed error messages
 - **DTD Support**: Validate XML against DTD definitions
+- **Schema Generation**: Generate XSD or DTD schemas from XML documents
 - **XML Formatting**: Automatic formatting and pretty-printing
 - **Tree View**: Visual representation of XML structure
 
@@ -101,9 +102,10 @@ python -m xmleditor.main
 2. **Open existing XML file**: File → Open (Ctrl+O)
 3. **Format XML**: XML → Format XML (Ctrl+Shift+F)
 4. **Validate XML**: XML → Validate (Ctrl+Shift+V)
-5. **Execute XPath**: XML → XPath Query (Ctrl+Shift+X)
-6. **Apply XSLT**: XML → XSLT Transform (Ctrl+Shift+T)
-7. **Change theme**: View → Theme → Select your preferred theme
+5. **Generate Schema**: XML → Generate Schema (Ctrl+Shift+G)
+6. **Execute XPath**: XML → XPath Query (Ctrl+Shift+X)
+7. **Apply XSLT**: XML → XSLT Transform (Ctrl+Shift+T)
+8. **Change theme**: View → Theme → Select your preferred theme
 
 ### Themes
 
@@ -134,6 +136,7 @@ To change themes, go to **View → Theme** and select your preferred option. You
 | Replace | Ctrl+H |
 | Format XML | Ctrl+Shift+F |
 | Validate | Ctrl+Shift+V |
+| Generate Schema | Ctrl+Shift+G |
 | XPath Query | Ctrl+Shift+X |
 | XSLT Transform | Ctrl+Shift+T |
 | Toggle Tree View | Ctrl+T |
@@ -270,7 +273,6 @@ For issues, questions, or contributions, please visit the [GitHub repository](ht
 ## Roadmap
 
 Future enhancements planned:
-- XML Schema generation from XML
 - JSON to XML conversion
 - XML diff and merge tools
 - Custom XML snippets

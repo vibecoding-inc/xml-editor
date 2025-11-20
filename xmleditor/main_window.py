@@ -8,13 +8,14 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                               QMessageBox, QInputDialog, QDockWidget, QTextEdit,
                               QLabel, QStatusBar)
 from PyQt6.QtGui import QAction, QKeySequence, QIcon, QActionGroup
-from PyQt6.QtCore import Qt, QSettings
+from PyQt6.QtCore import Qt, QSettings, QTimer
 from PyQt6.Qsci import QsciScintilla
 from xmleditor.xml_editor import XMLEditor
 from xmleditor.xml_tree_view import XMLTreeView
 from xmleditor.xpath_dialog import XPathDialog
 from xmleditor.validation_dialog import ValidationDialog
 from xmleditor.xslt_dialog import XSLTDialog
+from xmleditor.schema_generation_dialog import SchemaGenerationDialog
 from xmleditor.xml_utils import XMLUtilities
 from xmleditor.theme_manager import ThemeManager, ThemeType
 
@@ -35,6 +36,11 @@ class MainWindow(QMainWindow):
             self.current_theme = ThemeType(theme_name)
         except ValueError:
             self.current_theme = ThemeType.SYSTEM
+            
+        # Create timer for auto-refreshing tree view
+        self.tree_refresh_timer = QTimer()
+        self.tree_refresh_timer.setSingleShot(True)
+        self.tree_refresh_timer.timeout.connect(self.auto_refresh_tree_view)
         
         self.init_ui()
         self.create_new_document()
@@ -195,6 +201,14 @@ class MainWindow(QMainWindow):
         
         xml_menu.addSeparator()
         
+        generate_schema_action = QAction("&Generate Schema...", self)
+        generate_schema_action.setShortcut(QKeySequence("Ctrl+Shift+G"))
+        generate_schema_action.setStatusTip("Generate XSD or DTD schema from XML")
+        generate_schema_action.triggered.connect(self.show_schema_generation_dialog)
+        xml_menu.addAction(generate_schema_action)
+        
+        xml_menu.addSeparator()
+        
         xpath_action = QAction("&XPath Query...", self)
         xpath_action.setShortcut(QKeySequence("Ctrl+Shift+X"))
         xpath_action.setStatusTip("Execute XPath query")
@@ -328,7 +342,7 @@ class MainWindow(QMainWindow):
             self.current_file = None
             self.is_modified = False
             self.update_window_title()
-            self.tree_view.clear()
+            self.refresh_tree_view()
             
     def open_file(self):
         """Open an XML file."""
@@ -417,6 +431,17 @@ class MainWindow(QMainWindow):
         
         dialog = ValidationDialog(content, self)
         dialog.exec()
+    
+    def show_schema_generation_dialog(self):
+        """Open schema generation dialog."""
+        content = self.editor.get_text().strip()
+        
+        if not content:
+            QMessageBox.warning(self, "Warning", "No XML content to generate schema from")
+            return
+        
+        dialog = SchemaGenerationDialog(content, self)
+        dialog.exec()
         
     def show_xpath_dialog(self):
         """Open XPath query dialog."""
@@ -458,6 +483,18 @@ class MainWindow(QMainWindow):
                 self.output_dock.show()
         else:
             self.tree_view.clear()
+    
+    def auto_refresh_tree_view(self):
+        """Auto-refresh tree view with error suppression."""
+        content = self.editor.get_text().strip()
+        
+        if content:
+            try:
+                self.tree_view.load_xml(content)
+                # Don't clear/hide output panel during auto-refresh to avoid disruption
+            except Exception:
+                # Silently fail during auto-refresh (user is still typing)
+                pass
             
     def find_text(self):
         """Find text in editor."""
@@ -550,6 +587,10 @@ class MainWindow(QMainWindow):
         """Handle text changed event."""
         self.is_modified = True
         self.update_window_title()
+        
+        # Restart timer for auto-refreshing tree view (debounce)
+        self.tree_refresh_timer.stop()
+        self.tree_refresh_timer.start(500)  # Refresh 500ms after user stops typing
         
     def update_window_title(self):
         """Update window title based on current file and modified state."""
