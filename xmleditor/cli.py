@@ -37,7 +37,7 @@ def main():
                 sys.exit(1)
 
         if schema_content:
-            is_valid, message = XMLUtilities.validate_xml_with_xsd(xml_content, schema_content)
+            is_valid, message = XMLUtilities.validate_with_xsd(xml_content, schema_content)
         else:
             is_valid, message = XMLUtilities.validate_xml(xml_content)
 
