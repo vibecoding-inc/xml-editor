@@ -293,7 +293,9 @@ class XMLUtilities:
             if element_info['children']:
                 sequence = etree.SubElement(complex_type, f'{xs_ns}sequence')
                 
-                for child_name, child_occ in sorted(element_info['children'].items()):
+                # Use the order of first appearance instead of sorted order
+                for child_name in element_info['children_order']:
+                    child_occ = element_info['children'][child_name]
                     child_info = all_element_info[child_name]
                     
                     # Check if child has its own children or attributes
@@ -402,6 +404,7 @@ class XMLUtilities:
             if tag not in element_info:
                 element_info[tag] = {
                     'children': {},
+                    'children_order': [],  # Track order of first appearance
                     'attributes': {},
                     'text_content': [],
                     'parent_tags': set(),
@@ -426,7 +429,7 @@ class XMLUtilities:
             if element.text and element.text.strip():
                 info['text_content'].append(element.text.strip())
             
-            # Analyze children
+            # Analyze children and track their order
             child_counts = {}
             for child in element:
                 child_tag = child.tag
@@ -434,6 +437,8 @@ class XMLUtilities:
                 
                 if child_tag not in info['children']:
                     info['children'][child_tag] = {'min': float('inf'), 'max': 0}
+                    # Track the order of first appearance
+                    info['children_order'].append(child_tag)
                 
                 analyze_element(child, tag)
             
@@ -515,9 +520,10 @@ class XMLUtilities:
         
         # Generate element declaration
         if element_info['children']:
-            # Element has children
+            # Element has children - use order of first appearance
             child_specs = []
-            for child_name, child_occ in sorted(element_info['children'].items()):
+            for child_name in element_info['children_order']:
+                child_occ = element_info['children'][child_name]
                 spec = child_name
                 if child_occ['min'] == 0 and child_occ['max'] == 1:
                     spec += '?'
