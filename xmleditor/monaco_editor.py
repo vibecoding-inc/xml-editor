@@ -57,6 +57,7 @@ class MonacoEditor(QWidget):
         self._pending_content = None
         self._pending_theme = None
         self._suppress_change_signal = False
+        self._current_content = ""  # Cache of current content
         
         # Create layout
         layout = QVBoxLayout(self)
@@ -111,18 +112,17 @@ class MonacoEditor(QWidget):
     
     def _on_content_changed(self, content):
         """Handle content changed event from editor."""
+        self._current_content = content  # Update cached content
         if not self._suppress_change_signal:
             self.textChanged.emit()
     
     def get_text(self):
-        """Get the text content of the editor (synchronous)."""
-        # Since runJavaScript is async, we need to store the content
-        # This is a limitation - for now, we'll return empty and rely on callbacks
-        # In practice, Python should use callbacks to get content
-        return ""
+        """Get the text content of the editor (returns cached content)."""
+        return self._current_content
     
     def set_text(self, text):
         """Set the text content of the editor."""
+        self._current_content = text  # Update cache immediately
         if self._is_ready:
             self._set_content_internal(text)
         else:
