@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1e1e1e;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-family: sans-serif;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading Monaco Editor...</div>
+    <div id="container"></div>
+    
+    <!-- Load Monaco Editor from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+    
+    <!-- Load Yjs and Y-Monaco bindings -->
+    <script src="https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/y-monaco@0.1.6/dist/y-monaco.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/y-websocket@1.5.0/dist/y-websocket.min.js"></script>
+    
+    <!-- Load QWebChannel for Python communication -->
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    
+    <script>
+        let editor = null;
+        let yDoc = null;
+        let yText = null;
+        let yProvider = null;
+        let binding = null;
+        let backend = null;
+        let currentTheme = 'vs-dark';
+        let isInitialized = false;
+        
+        // Initialize QWebChannel for Python communication
+        new QWebChannel(qt.webChannelTransport, function(channel) {
+            backend = channel.objects.backend;
+            console.log('QWebChannel initialized');
+        });
+        
+        // Configure Monaco loader
+        require.config({ 
+            paths: { 
+                'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs'
+            }
+        });
+        
+        // Initialize Monaco Editor
+        require(['vs/editor/editor.main'], function() {
+            editor = monaco.editor.create(document.getElementById('container'), {
+                value: '<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    \n</root>',
+                language: 'xml',
+                theme: currentTheme,
+                automaticLayout: true,
+                wordWrap: 'off',
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                fontSize: 14,
+                fontFamily: 'Courier New, monospace',
+                lineNumbers: 'on',
+                renderWhitespace: 'selection',
+                folding: true,
+                bracketPairColorization: {
+                    enabled: true
+                }
+            });
+            
+            isInitialized = true;
+            console.log('Monaco Editor initialized');
+            
+            // Initialize Yjs document
+            yDoc = new Y.Doc();
+            yText = yDoc.getText('monaco');
+            
+            // Set up content change listener to notify Python
+            editor.onDidChangeModelContent((event) => {
+                if (backend && backend.onContentChanged) {
+                    backend.onContentChanged(editor.getValue());
+                }
+            });
+            
+            // Notify Python that editor is ready
+            if (backend && backend.onEditorReady) {
+                backend.onEditorReady();
+            }
+        });
+        
+        // Function to get editor content
+        function getContent() {
+            if (editor) {
+                return editor.getValue();
+            }
+            return '';
+        }
+        
+        // Function to set editor content
+        function setContent(content) {
+            if (editor) {
+                editor.setValue(content);
+            }
+        }
+        
+        // Function to set theme
+        function setTheme(theme) {
+            if (editor) {
+                currentTheme = theme;
+                monaco.editor.setTheme(theme);
+            }
+        }
+        
+        // Function to set word wrap
+        function setWordWrap(enabled) {
+            if (editor) {
+                editor.updateOptions({
+                    wordWrap: enabled ? 'on' : 'off'
+                });
+            }
+        }
+        
+        // Function to connect to collaboration server
+        function connectCollaboration(serverUrl, roomName) {
+            if (!editor || !yDoc) {
+                console.error('Editor not initialized');
+                return false;
+            }
+            
+            try {
+                // Disconnect existing provider if any
+                if (yProvider) {
+                    yProvider.destroy();
+                    yProvider = null;
+                }
+                
+                // Destroy existing binding if any
+                if (binding) {
+                    binding.destroy();
+                    binding = null;
+                }
+                
+                // Create new Y-Monaco binding
+                binding = new MonacoBinding(
+                    yText,
+                    editor.getModel(),
+                    new Set([editor]),
+                    yProvider ? yProvider.awareness : null
+                );
+                
+                // Create WebSocket provider
+                yProvider = new Y.WebsocketProvider(
+                    serverUrl.replace('http://', 'ws://').replace('https://', 'wss://'),
+                    roomName,
+                    yDoc
+                );
+                
+                // Set up connection status handlers
+                yProvider.on('status', event => {
+                    console.log('WebSocket status:', event.status);
+                    if (backend && backend.onCollaborationStatus) {
+                        backend.onCollaborationStatus(event.status);
+                    }
+                });
+                
+                yProvider.on('connection-error', error => {
+                    console.error('WebSocket connection error:', error);
+                    if (backend && backend.onCollaborationError) {
+                        backend.onCollaborationError(error.toString());
+                    }
+                });
+                
+                console.log('Collaboration connected:', serverUrl, roomName);
+                return true;
+            } catch (error) {
+                console.error('Failed to connect collaboration:', error);
+                if (backend && backend.onCollaborationError) {
+                    backend.onCollaborationError(error.toString());
+                }
+                return false;
+            }
+        }
+        
+        // Function to disconnect from collaboration
+        function disconnectCollaboration() {
+            if (yProvider) {
+                yProvider.destroy();
+                yProvider = null;
+                console.log('Collaboration disconnected');
+                
+                if (backend && backend.onCollaborationStatus) {
+                    backend.onCollaborationStatus('disconnected');
+                }
+            }
+            
+            if (binding) {
+                binding.destroy();
+                binding = null;
+            }
+        }
+        
+        // Function to check if collaboration is active
+        function isCollaborationActive() {
+            return yProvider !== null && yProvider.wsconnected;
+        }
+        
+        // Make functions available globally for Python to call
+        window.monacoEditor = {
+            getContent: getContent,
+            setContent: setContent,
+            setTheme: setTheme,
+            setWordWrap: setWordWrap,
+            connectCollaboration: connectCollaboration,
+            disconnectCollaboration: disconnectCollaboration,
+            isCollaborationActive: isCollaborationActive
+        };
+        
+        console.log('Monaco Editor interface ready');
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "xml-editor-collab-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for XML Editor collaborative editing",
+  "main": "src/index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "collaboration",
+    "yjs",
+    "websocket"
+  ],
+  "author": "XML Editor Team",
+  "license": "MIT"
+}

@@ -137,6 +137,10 @@ Thumbs.db
 *.xml~
 *.bak
 
+# Cloudflare Worker
+cloudflare-worker/node_modules/
+cloudflare-worker/.wrangler/
+
 # Nix
 result
 result-*
