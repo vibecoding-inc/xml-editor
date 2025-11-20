@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<employees>
+    <employee id="001">
+        <firstName>John</firstName>
+        <lastName>Doe</lastName>
+        <email>john.doe@example.com</email>
+        <department>Engineering</department>
+        <salary currency="USD">75000</salary>
+        <hireDate>2020-01-15</hireDate>
+    </employee>
+    <employee id="002">
+        <firstName>Jane</firstName>
+        <lastName>Smith</lastName>
+        <email>jane.smith@example.com</email>
+        <department>Marketing</department>
+        <salary currency="USD">65000</salary>
+        <hireDate>2019-06-01</hireDate>
+    </employee>
+    <employee id="003">
+        <firstName>Bob</firstName>
+        <lastName>Johnson</lastName>
+        <email>bob.johnson@example.com</email>
+        <department>Engineering</department>
+        <salary currency="USD">80000</salary>
+        <hireDate>2018-03-20</hireDate>
+    </employee>
+</employees>

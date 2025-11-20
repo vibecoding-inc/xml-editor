@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+    <product>
+        <id>P001</id>
+        <name>Laptop</name>
+        <category>Electronics</category>
+        <price>999.99</price>
+        <stock>50</stock>
+        <specifications>
+            <cpu>Intel i7</cpu>
+            <ram>16GB</ram>
+            <storage>512GB SSD</storage>
+        </specifications>
+    </product>
+    <product>
+        <id>P002</id>
+        <name>Mouse</name>
+        <category>Accessories</category>
+        <price>29.99</price>
+        <stock>200</stock>
+        <specifications>
+            <type>Wireless</type>
+            <dpi>1600</dpi>
+        </specifications>
+    </product>
+    <product>
+        <id>P003</id>
+        <name>Monitor</name>
+        <category>Electronics</category>
+        <price>299.99</price>
+        <stock>75</stock>
+        <specifications>
+            <size>27 inches</size>
+            <resolution>2560x1440</resolution>
+            <refreshRate>144Hz</refreshRate>
+        </specifications>
+    </product>
+</catalog>
