@@ -20,36 +20,30 @@
             src = ./.;
             
             format = "pyproject";
+
+            extras = if gui then [ "gui" ] else [];
+
+            pythonRelaxDeps = if gui then [ "PyQt6-QScintilla" ] else [];
             
             nativeBuildInputs = with pkgs.python3Packages; [
               setuptools
               wheel
+            ] ++ pkgs.lib.optionals gui [
+              pkgs.qt6.wrapQtAppsHook
             ];
             
             propagatedBuildInputs = with pkgs.python3Packages; [
-              pyqt6
-              pyqt6-sip
               lxml
               pygments
             ] ++ pkgs.lib.optionals gui [
+              pyqt6
+              pyqt6-sip
               pkgs.qt6.qtbase
               pkgs.qt6.qtwayland
             ];
             
-            buildInputs = pkgs.lib.optionals gui [
-              pkgs.libsForQt5.qscintilla
-              pkgs.qt6.qtbase
-            ];
-            
             # Don't check for PyQt6-QScintilla in build phase as it's provided by system
             doCheck = false;
-            
-            postInstall = pkgs.lib.optionalString gui ''
-              # Wrap GUI application with Qt environment
-              wrapProgram $out/bin/xml-editor \
-                --prefix QT_PLUGIN_PATH : ${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix} \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.qt6.qtbase ]}
-            '';
             
             meta = with pkgs.lib; {
               description = "A fully-featured cross-platform XML editor with XPath, validation, and schema support";
@@ -57,7 +51,7 @@
               license = licenses.mit;
               maintainers = [ ];
               platforms = platforms.unix;
-              mainProgram = "xml-editor";
+              mainProgram = if gui then "xml-editor" else "xml-editor-cli";
             };
           };
         
@@ -80,11 +74,11 @@
           
           # Test CLI version
           echo "Testing CLI package..."
-          if ! command -v xml-editor &> /dev/null; then
-            echo "ERROR: xml-editor command not found"
+          if ! command -v xml-editor-cli &> /dev/null; then
+            echo "ERROR: xml-editor-cli command not found"
             exit 1
           fi
-          echo "✓ xml-editor command found"
+          echo "✓ xml-editor-cli command found"
           
           # Test Python module import
           echo "Testing Python module import..."
@@ -158,7 +152,7 @@ print('✓ XML formatting works')
           };
           cli = {
             type = "app";
-            program = "${xml-editor-cli}/bin/xml-editor";
+            program = "${xml-editor-cli}/bin/xml-editor-cli";
           };
           test = {
             type = "app";

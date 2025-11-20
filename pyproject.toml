@@ -28,10 +28,14 @@ classifiers = [
     "Topic :: Text Editors",
 ]
 dependencies = [
-    "PyQt6>=6.6.0",
-    "PyQt6-QScintilla>=2.14.0",
     "lxml>=5.0.0",
     "pygments>=2.17.0",
+]
+
+[project.optional-dependencies]
+gui = [
+    "PyQt6>=6.6.0",
+    "PyQt6-QScintilla>=2.14.0",
 ]
 
 [project.urls]
@@ -40,10 +44,10 @@ Repository = "https://github.com/profiluefter/xml-editor"
 Issues = "https://github.com/profiluefter/xml-editor/issues"
 
 [project.scripts]
-xml-editor = "xmleditor.main:main"
+xml-editor-cli = "xmleditor.cli:main"
 
 [project.gui-scripts]
-xml-editor-gui = "xmleditor.main:main"
+xml-editor = "xmleditor.main:main"
 
 [tool.setuptools]
 packages = ["xmleditor"]
