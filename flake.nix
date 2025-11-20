@@ -38,6 +38,7 @@
             ] ++ pkgs.lib.optionals gui [
               pyqt6
               pyqt6-sip
+              qscintilla-qt6
               pkgs.qt6.qtbase
               pkgs.qt6.qtwayland
             ];
