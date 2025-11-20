@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                               QSplitter, QMenuBar, QMenu, QToolBar, QFileDialog, 
                               QMessageBox, QInputDialog, QDockWidget, QTextEdit,
                               QLabel, QStatusBar)
-from PyQt6.QtGui import QAction, QKeySequence, QIcon
+from PyQt6.QtGui import QAction, QKeySequence, QIcon, QActionGroup
 from PyQt6.QtCore import Qt, QSettings, QTimer
 from PyQt6.Qsci import QsciScintilla
 from xmleditor.xml_editor import XMLEditor
@@ -17,6 +17,7 @@ from xmleditor.validation_dialog import ValidationDialog
 from xmleditor.xslt_dialog import XSLTDialog
 from xmleditor.schema_generation_dialog import SchemaGenerationDialog
 from xmleditor.xml_utils import XMLUtilities
+from xmleditor.theme_manager import ThemeManager, ThemeType
 
 
 class MainWindow(QMainWindow):
@@ -29,6 +30,13 @@ class MainWindow(QMainWindow):
         self.settings = QSettings("XMLEditor", "XMLEditor")
         self.recent_files = self.load_recent_files()
         
+        # Load theme preference
+        theme_name = self.settings.value("theme", ThemeType.SYSTEM.value)
+        try:
+            self.current_theme = ThemeType(theme_name)
+        except ValueError:
+            self.current_theme = ThemeType.SYSTEM
+            
         # Create timer for auto-refreshing tree view
         self.tree_refresh_timer = QTimer()
         self.tree_refresh_timer.setSingleShot(True)
@@ -53,8 +61,8 @@ class MainWindow(QMainWindow):
         # Create splitter for editor and tree view
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Create editor
-        self.editor = XMLEditor()
+        # Create editor with theme
+        self.editor = XMLEditor(theme_type=self.current_theme)
         self.editor.textChanged.connect(self.on_text_changed)
         splitter.addWidget(self.editor)
         
@@ -240,6 +248,24 @@ class MainWindow(QMainWindow):
         word_wrap_action.setCheckable(True)
         word_wrap_action.triggered.connect(self.toggle_word_wrap)
         view_menu.addAction(word_wrap_action)
+        
+        view_menu.addSeparator()
+        
+        # Theme submenu
+        theme_menu = view_menu.addMenu("&Theme")
+        theme_action_group = QActionGroup(self)
+        theme_action_group.setExclusive(True)
+        
+        theme_names = ThemeManager.get_theme_names()
+        for theme_type, theme_name in theme_names.items():
+            action = QAction(theme_name, self)
+            action.setCheckable(True)
+            action.setData(theme_type)
+            if theme_type == self.current_theme:
+                action.setChecked(True)
+            action.triggered.connect(lambda checked, t=theme_type: self.change_theme(t))
+            theme_action_group.addAction(action)
+            theme_menu.addAction(action)
         
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -549,6 +575,13 @@ class MainWindow(QMainWindow):
             self.editor.setWrapMode(QsciScintilla.WrapMode.WrapWord)
         else:
             self.editor.setWrapMode(QsciScintilla.WrapMode.WrapNone)
+    
+    def change_theme(self, theme_type):
+        """Change the editor theme."""
+        self.current_theme = theme_type
+        self.editor.apply_theme(theme_type)
+        self.settings.setValue("theme", theme_type.value)
+        self.statusBar().showMessage(f"Theme changed to {ThemeManager.get_theme_names()[theme_type]}")
             
     def on_text_changed(self):
         """Handle text changed event."""

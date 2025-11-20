@@ -28,6 +28,12 @@ A fully-featured cross-platform XML editor desktop application built with Python
 - **Brace Matching**: Highlight matching tags
 - **Undo/Redo**: Full undo/redo support
 
+### Theme Support
+- **Modern Color Schemes**: Beautiful Catppuccin themes for enhanced readability
+- **System Theme Detection**: Automatically adapts to system dark/light mode
+- **Multiple Theme Options**: Choose from Latte (light), Frappé, Macchiato, or Mocha (dark) themes
+- **Persistent Theme Settings**: Your theme preference is saved across sessions
+
 ## Installation
 
 ### Prerequisites
@@ -99,6 +105,19 @@ python -m xmleditor.main
 5. **Generate Schema**: XML → Generate Schema (Ctrl+Shift+G)
 6. **Execute XPath**: XML → XPath Query (Ctrl+Shift+X)
 7. **Apply XSLT**: XML → XSLT Transform (Ctrl+Shift+T)
+8. **Change theme**: View → Theme → Select your preferred theme
+
+### Themes
+
+The editor supports multiple beautiful color schemes powered by [Catppuccin](https://catppuccin.com/):
+
+- **System (Auto)**: Automatically detects your system's dark/light mode and applies the appropriate theme
+- **Catppuccin Latte**: A light, warm theme perfect for daytime coding
+- **Catppuccin Frappé**: A soft dark theme with muted colors
+- **Catppuccin Macchiato**: A medium dark theme with vibrant accents
+- **Catppuccin Mocha**: A deep dark theme ideal for low-light environments
+
+To change themes, go to **View → Theme** and select your preferred option. Your selection is saved and will be restored when you reopen the application.
 
 ### Keyboard Shortcuts
 

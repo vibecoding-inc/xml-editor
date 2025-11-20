@@ -177,12 +177,16 @@ Click any element to see its details.
 
 ### Syntax Highlighting
 
-Automatic color coding:
-- **Blue**: Element tags
-- **Red**: Attribute names
-- **Green**: Attribute values
+Automatic color coding for XML elements (colors shown are for default theme):
+- **Purple/Mauve**: Element tags
+- **Green**: Attribute names
+- **Yellow**: Attribute values (strings)
 - **Gray**: Comments
-- **Purple**: CDATA sections
+- **Pink**: CDATA sections
+- **Orange**: Numbers
+- **Teal**: Entities (e.g., &amp;)
+
+Note: Actual colors vary based on your selected theme. All Catppuccin themes provide excellent contrast and readability.
 
 ### Code Folding
 
@@ -206,6 +210,27 @@ Press Enter - the next line is automatically indented.
 **View → Word Wrap**
 
 Toggle word wrapping for long lines.
+
+### Theme Selection
+
+**View → Theme**
+
+Choose from multiple beautiful color schemes:
+
+1. **System (Auto)** - Automatically detects your system's dark/light mode and applies the appropriate theme
+2. **Catppuccin Latte** - A light, warm theme perfect for daytime coding
+3. **Catppuccin Frappé** - A soft dark theme with muted colors
+4. **Catppuccin Macchiato** - A medium dark theme with vibrant accents
+5. **Catppuccin Mocha** - A deep dark theme ideal for low-light environments
+
+Your theme preference is automatically saved and restored when you reopen the application.
+
+The themes provide consistent coloring across:
+- Editor background and text
+- Line numbers and margins
+- Syntax highlighting for XML elements
+- Selection and matched braces
+- All UI components
 
 ### Output Panel
 
