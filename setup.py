@@ -39,6 +39,10 @@ setup(
     },
     include_package_data=True,
     package_data={
-        "xmleditor": ["resources/*"],
+        "xmleditor": [
+            "resources/*",
+            "resources/dist/*",
+            "resources/web/dist/*",
+        ],
     },
 )

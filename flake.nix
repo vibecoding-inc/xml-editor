@@ -194,7 +194,11 @@
               echo "Copying Monaco bundle into resources..."
               mkdir -p xmleditor/resources/web/dist
               cp -r ${monacoBundle}/* xmleditor/resources/web/dist/
-              echo "Monaco bundle copied successfully"
+              
+              # Also copy to the location expected by Python code
+              mkdir -p xmleditor/resources/dist
+              cp -r ${monacoBundle}/* xmleditor/resources/dist/
+              echo "Monaco bundle copied successfully to both locations"
             '';
             
             # Don't check for PyQt6-QScintilla in build phase as it's provided by system
