@@ -98,20 +98,19 @@ class MonacoEditor(QWidget):
         
         layout.addWidget(self.web_view)
         
-        # Get the bundle path
+        # Get the bundle path - use relative path since we're setting baseUrl
         resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
         bundle_path = os.path.join(resources_dir, 'dist', 'bundle.js')
         
-        # Convert to file:// URL
-        from PyQt6.QtCore import QUrl
-        bundle_url = QUrl.fromLocalFile(bundle_path).toString()
         print(f"[VERBOSE] Python: Bundle path: {bundle_path}")
-        print(f"[VERBOSE] Python: Bundle URL: {bundle_url}")
         print(f"[VERBOSE] Python: Bundle exists: {os.path.exists(bundle_path)}")
+        
+        # Pass relative path for use in HTML (relative to resources dir)
+        bundle_relative_path = 'dist/bundle.js'
         
         # Set up web channel for Python-JS communication
         self.channel = QWebChannel()
-        self.handler = MonacoCallHandler(bundle_url)
+        self.handler = MonacoCallHandler(bundle_relative_path)
         self.channel.registerObject('backend', self.handler)
         self.web_view.page().setWebChannel(self.channel)
         
@@ -131,17 +130,33 @@ class MonacoEditor(QWidget):
         # Use file path instead of qrc for better compatibility
         resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
         html_path = os.path.join(resources_dir, 'monaco_editor_bundled.html')
+        bundle_path = os.path.join(resources_dir, 'dist', 'bundle.js')
         
         print(f"[VERBOSE] Python: HTML path: {html_path}")
         print(f"[VERBOSE] Python: HTML exists: {os.path.exists(html_path)}")
+        print(f"[VERBOSE] Python: Bundle path: {bundle_path}")
+        print(f"[VERBOSE] Python: Bundle exists: {os.path.exists(bundle_path)}")
         
-        if os.path.exists(html_path):
-            url = QUrl.fromLocalFile(html_path)
-            print(f"[VERBOSE] Python: Loading URL: {url.toString()}")
-            self.web_view.setUrl(url)
+        if os.path.exists(html_path) and os.path.exists(bundle_path):
+            # Read the HTML content
+            with open(html_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            # Convert bundle path to file:// URL
+            bundle_url = QUrl.fromLocalFile(bundle_path).toString()
+            print(f"[VERBOSE] Python: Bundle URL: {bundle_url}")
+            
+            # Replace the placeholder with a static script tag
+            script_tag = f'<script src="{bundle_url}"></script>'
+            html_content = html_content.replace('<!-- BUNDLE_SCRIPT_TAG_PLACEHOLDER -->', script_tag)
+            
+            # Set HTML with base URL for resources directory
+            base_url = QUrl.fromLocalFile(resources_dir + '/')
+            print(f"[VERBOSE] Python: Loading HTML with base URL: {base_url.toString()}")
+            self.web_view.setHtml(html_content, base_url)
         else:
-            print("[VERBOSE] Python: ERROR - HTML file not found!")
-            self.web_view.setHtml('<html><body><h1 style="color: red;">Monaco Editor HTML not found</h1></body></html>')
+            print("[VERBOSE] Python: ERROR - HTML or bundle file not found!")
+            self.web_view.setHtml('<html><body><h1 style="color: red;">Monaco Editor HTML or bundle not found</h1></body></html>')
     
     def _on_editor_ready(self):
         """Handle editor ready event."""

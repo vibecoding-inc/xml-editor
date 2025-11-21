@@ -40,10 +40,7 @@
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
     
     <!-- Bundled Monaco Editor + Y.js (loaded from local file system) -->
-    <script>
-        // We'll load bundle.js dynamically from Python-provided path
-        console.log('[VERBOSE] Waiting for bundle.js path from Python...');
-    </script>
+    <!-- BUNDLE_SCRIPT_TAG_PLACEHOLDER -->
     
     <script>
         console.log('[VERBOSE] Monaco editor HTML loaded');
@@ -59,23 +56,16 @@
             console.log('[VERBOSE] QWebChannel initialized');
             backend = channel.objects.backend;
             
-            // Get bundle path synchronously
-            const bundlePath = backend.getBundlePath();
-            console.log('[VERBOSE] Bundle path received:', bundlePath);
-            
-            // Load the bundle dynamically
-            const script = document.createElement('script');
-            script.src = bundlePath;
-            script.onload = function() {
-                console.log('[VERBOSE] Bundle loaded successfully');
+            // Bundle is loaded statically, so we can initialize directly
+            console.log('[VERBOSE] Checking if bundle is loaded...');
+            if (window.monaco) {
+                console.log('[VERBOSE] Bundle already loaded, initializing editor');
                 initializeEditor();
-            };
-            script.onerror = function(error) {
-                console.error('[VERBOSE] Failed to load bundle:', error);
-                document.getElementById('loading').textContent = 'Error loading Monaco bundle: ' + bundlePath;
+            } else {
+                console.error('[VERBOSE] Bundle not loaded!');
+                document.getElementById('loading').textContent = 'Error: Monaco bundle not loaded';
                 document.getElementById('loading').style.color = '#f48771';
-            };
-            document.head.appendChild(script);
+            }
         });
         
         function initializeEditor() {
