@@ -38,6 +38,7 @@
             ] ++ pkgs.lib.optionals gui [
               pyqt6
               pyqt6-sip
+              pyqt6-webengine
               qscintilla-qt6
               pkgs.qt6.qtbase
               pkgs.qt6.qtwayland
@@ -179,6 +180,7 @@ print('✓ XML formatting works')
           buildInputs = with pkgs; [
             python3
             python3Packages.pyqt6
+            python3Packages.pyqt6-webengine
             python3Packages.lxml
             python3Packages.pygments
             python3Packages.setuptools
