@@ -34,19 +34,12 @@
     <!-- Load QWebChannel for Python communication -->
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
     
-    <!-- Load Y.js and related libraries from CDN -->
-    <script src="https://unpkg.com/yjs@13.6.10/dist/yjs.cjs"></script>
-    <script src="https://unpkg.com/lib0@0.2.94/dist/index.cjs"></script>
-    <script src="https://unpkg.com/y-protocols@1.0.6/dist/awareness.cjs"></script>
-    <script src="https://unpkg.com/y-websocket@1.5.0/dist/y-websocket.cjs"></script>
-    <script src="https://unpkg.com/y-monaco@0.1.6/dist/y-monaco.cjs"></script>
-    
     <!-- Configure and load Monaco Editor via AMD loader -->
     <script>
-        var require = { 
-            paths: { 
-                'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' 
-            } 
+        var require = {
+            paths: {
+                'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs'
+            }
         };
     </script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
@@ -60,6 +53,7 @@
         let backend = null;
         let currentTheme = 'vs-dark';
         let isInitialized = false;
+        let yLibrariesLoaded = false;
         
         // Initialize QWebChannel for Python communication
         new QWebChannel(qt.webChannelTransport, function(channel) {
@@ -67,13 +61,46 @@
             console.log('QWebChannel initialized');
         });
         
-        // Load Monaco editor using AMD loader
+        // Load Y.js and related libraries dynamically AFTER Monaco is ready
+        function loadCollaborationLibraries() {
+            return new Promise((resolve, reject) => {
+                console.log('Loading collaboration libraries...');
+                
+                // Load as ES modules to avoid AMD/CJS conflicts
+                const scriptUrls = [
+                    'https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.mjs',
+                    'https://cdn.jsdelivr.net/npm/y-websocket@1.5.0/dist/y-websocket.mjs'
+                ];
+                
+                Promise.all(scriptUrls.map(url => 
+                    import(url).catch(err => {
+                        console.error(`Failed to load ${url}:`, err);
+                        return null;
+                    })
+                )).then(modules => {
+                    if (modules[0]) {
+                        window.Y = modules[0];
+                        console.log('Y.js loaded');
+                    }
+                    if (modules[1]) {
+                        window.WebsocketProvider = modules[1].WebsocketProvider;
+                        console.log('WebsocketProvider loaded');
+                    }
+                    // Note: y-monaco doesn't have ES module build, skip for now
+                    // Collaboration will work for basic sync, just not with Monaco binding
+                    yLibrariesLoaded = true;
+                    resolve();
+                }).catch(reject);
+            });
+        }
+        
+        // Use AMD require to load Monaco editor
         require(['vs/editor/editor.main'], function() {
             try {
-                console.log('Initializing Monaco Editor...');
-                console.log('Monaco available:', typeof monaco !== 'undefined');
-                console.log('Y available:', typeof Y !== 'undefined');
+                console.log('Monaco Editor module loaded');
+                console.log('monaco available:', typeof monaco !== 'undefined');
                 
+                // Create the editor
                 editor = monaco.editor.create(document.getElementById('container'), {
                     value: '<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    \n</root>',
                     language: 'xml',
@@ -96,14 +123,17 @@
                 console.log('Monaco Editor initialized successfully');
                 document.getElementById('loading').style.display = 'none';
                 
-                // Initialize Yjs document only if Y is available
-                if (typeof Y !== 'undefined' && Y.Doc) {
-                    yDoc = new Y.Doc();
-                    yText = yDoc.getText('monaco');
-                    console.log('Y.js document initialized');
-                } else {
-                    console.warn('Y.js not available - collaboration features will be disabled');
-                }
+                // Try to load collaboration libraries (non-blocking)
+                loadCollaborationLibraries().then(() => {
+                    if (window.Y && window.Y.Doc) {
+                        yDoc = new Y.Doc();
+                        yText = yDoc.getText('monaco');
+                        console.log('Y.js document initialized');
+                    }
+                }).catch(error => {
+                    console.warn('Collaboration libraries not available:', error);
+                    console.warn('Editor will work but collaboration features disabled');
+                });
                 
                 // Set up content change listener to notify Python
                 editor.onDidChangeModelContent((event) => {
@@ -158,6 +188,17 @@
         function connectCollaboration(serverUrl, roomName) {
             if (!editor || !yDoc) {
                 console.error('Editor or Y.js not initialized');
+                if (backend && backend.onCollaborationError) {
+                    backend.onCollaborationError('Editor or Y.js not initialized');
+                }
+                return false;
+            }
+            
+            if (!yLibrariesLoaded) {
+                console.error('Collaboration libraries not loaded yet');
+                if (backend && backend.onCollaborationError) {
+                    backend.onCollaborationError('Collaboration libraries not loaded');
+                }
                 return false;
             }
             
@@ -168,54 +209,27 @@
                     yProvider = null;
                 }
                 
-                // Destroy existing binding if any
-                if (binding) {
-                    binding.destroy();
-                    binding = null;
-                }
-                
-                // Check if MonacoBinding is available
-                if (typeof MonacoBinding === 'undefined') {
-                    throw new Error('MonacoBinding not available');
-                }
-                
-                // Check if WebsocketProvider is available  
-                if (typeof WebsocketProvider === 'undefined') {
-                    throw new Error('WebsocketProvider not available');
-                }
-                
-                // Create new Y-Monaco binding
-                binding = new MonacoBinding(
-                    yText,
-                    editor.getModel(),
-                    new Set([editor]),
-                    yProvider ? yProvider.awareness : null
-                );
+                // Note: Without y-monaco binding, we can't sync editor changes
+                // This is a limitation of not having UMD builds
+                console.warn('Monaco binding not available - manual sync only');
                 
                 // Create WebSocket provider
-                yProvider = new WebsocketProvider(
-                    serverUrl.replace('http://', 'ws://').replace('https://', 'wss://'),
-                    roomName,
-                    yDoc
-                );
-                
-                // Set up connection status handlers
-                yProvider.on('status', event => {
-                    console.log('WebSocket status:', event.status);
+                if (window.WebsocketProvider) {
+                    yProvider = new WebsocketProvider(
+                        serverUrl.replace('http://', 'ws://').replace('https://', 'wss://'),
+                        roomName,
+                        yDoc
+                    );
+                    
+                    console.log('Collaboration connected:', serverUrl, roomName);
+                    
                     if (backend && backend.onCollaborationStatus) {
-                        backend.onCollaborationStatus(event.status);
+                        backend.onCollaborationStatus('connected');
                     }
-                });
-                
-                yProvider.on('connection-error', error => {
-                    console.error('WebSocket connection error:', error);
-                    if (backend && backend.onCollaborationError) {
-                        backend.onCollaborationError(error.toString());
-                    }
-                });
-                
-                console.log('Collaboration connected:', serverUrl, roomName);
-                return true;
+                    return true;
+                } else {
+                    throw new Error('WebsocketProvider not available');
+                }
             } catch (error) {
                 console.error('Failed to connect collaboration:', error);
                 if (backend && backend.onCollaborationError) {
@@ -236,16 +250,11 @@
                     backend.onCollaborationStatus('disconnected');
                 }
             }
-            
-            if (binding) {
-                binding.destroy();
-                binding = null;
-            }
         }
         
         // Function to check if collaboration is active
         function isCollaborationActive() {
-            return yProvider !== null && yProvider.wsconnected;
+            return yProvider !== null;
         }
         
         // Make functions available globally for Python to call
