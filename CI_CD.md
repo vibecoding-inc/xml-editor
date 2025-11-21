@@ -7,7 +7,7 @@ This document describes the Continuous Integration and Continuous Deployment (CI
 The project uses GitHub Actions for automated testing, building, and releasing. There are two main workflows:
 
 1. **CI Workflow** (`ci.yml`) - Runs automated tests on every push and pull request
-2. **Release Workflow** (`release.yml`) - Builds cross-platform packages when a release is created
+2. **Release Workflow** (`release.yml`) - Builds packages when a release is created
 
 ## CI Workflow
 
@@ -18,13 +18,13 @@ The CI workflow automatically runs on:
 ### Jobs
 
 #### Python Tests (`test-python`)
-- **Platforms**: Ubuntu, macOS, Windows
+- **Platforms**: Ubuntu
 - **Python Versions**: 3.8, 3.9, 3.10, 3.11, 3.12
 - **Tests Run**:
   - `test_functionality.py` - Core XML functionality tests
   - `test_schema_generation.py` - Schema generation tests
 
-This job ensures the Python package works across different operating systems and Python versions.
+This job ensures the Python package works across different Python versions.
 
 #### Nix Flake Checks (`test-nix`)
 - **Platform**: Ubuntu (Linux)
@@ -46,11 +46,11 @@ The release workflow runs on:
 ### Jobs
 
 #### Build Python Packages (`build-python-packages`)
-- **Platforms**: Ubuntu, macOS, Windows
+- **Platforms**: Ubuntu
 - **Outputs**: Python wheels and source distributions in `dist/` directory
-- **Artifacts**: Uploaded as `python-package-{os}` artifacts
+- **Artifacts**: Uploaded as `python-package-ubuntu-latest` artifacts
 
-These packages can be installed via pip and work on the respective platforms.
+These packages can be installed via pip and work on all platforms (the Python package is platform-independent).
 
 #### Build Nix Packages (`build-nix-packages`)
 - **Platforms**: x86_64-linux, aarch64-linux
