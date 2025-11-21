@@ -137,6 +137,25 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         
+        # Build Monaco editor bundle with npm
+        monacoBundle = pkgs.buildNpmPackage {
+          pname = "xml-editor-monaco-bundle";
+          version = "1.0.0";
+          
+          src = ./xmleditor/resources/web;
+          
+          npmDepsHash = "sha256-/Dwd/fY4HidsYdC76Qg7wGqavPnDJhGPlW4dRdBttgg=";
+          
+          buildPhase = ''
+            npm run build
+          '';
+          
+          installPhase = ''
+            mkdir -p $out
+            cp -r dist/* $out/
+          '';
+        };
+        
         # Common Python package build
         pythonPackage = { pname, gui ? false }:
           pkgs.python3Packages.buildPythonApplication {
@@ -164,10 +183,19 @@
             ] ++ pkgs.lib.optionals gui [
               pyqt6
               pyqt6-sip
+              pyqt6-webengine
               qscintilla-qt6
               pkgs.qt6.qtbase
               pkgs.qt6.qtwayland
             ];
+            
+            # Copy Monaco bundle into resources during build
+            preBuild = pkgs.lib.optionalString gui ''
+              echo "Copying Monaco bundle into resources..."
+              mkdir -p xmleditor/resources/web/dist
+              cp -r ${monacoBundle}/* xmleditor/resources/web/dist/
+              echo "Monaco bundle copied successfully"
+            '';
             
             # Don't check for PyQt6-QScintilla in build phase as it's provided by system
             doCheck = false;
@@ -312,6 +340,8 @@ print('✓ XML formatting works')
           buildInputs = with pkgs; [
             python3
             python3Packages.pyqt6
+            python3Packages.pyqt6-webengine
+            python3Packages.qscintilla-qt6
             python3Packages.lxml
             python3Packages.pygments
             python3Packages.setuptools

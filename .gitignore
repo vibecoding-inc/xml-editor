@@ -137,6 +137,16 @@ Thumbs.db
 *.xml~
 *.bak
 
+# Cloudflare Worker
+cloudflare-worker/node_modules/
+cloudflare-worker/.wrangler/
+cloudflare-worker/dist/
+
+# Monaco/Y.js web bundle artifacts
+xmleditor/resources/web/node_modules/
+xmleditor/resources/web/dist/
+xmleditor/resources/web/package-lock.json
+
 # Nix
 result
 result-*

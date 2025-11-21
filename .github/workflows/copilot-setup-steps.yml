@@ -45,3 +45,8 @@ jobs:
           nix --version
           echo "Nix flakes enabled: $(nix flake show --help > /dev/null 2>&1 && echo 'yes' || echo 'no')"
           echo "Nix is ready for Copilot!"
+
+      - name: Install Wrangler CLI
+        run: |
+          npm install -g wrangler
+          wrangler --version

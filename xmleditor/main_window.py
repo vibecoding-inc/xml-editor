@@ -11,13 +11,19 @@ from PyQt6.QtGui import QAction, QKeySequence, QIcon, QActionGroup
 from PyQt6.QtCore import Qt, QSettings, QTimer
 from PyQt6.Qsci import QsciScintilla
 from xmleditor.xml_editor import XMLEditor
+from xmleditor.monaco_editor import MonacoEditor
 from xmleditor.xml_tree_view import XMLTreeView
 from xmleditor.xpath_dialog import XPathDialog
 from xmleditor.validation_dialog import ValidationDialog
 from xmleditor.xslt_dialog import XSLTDialog
 from xmleditor.schema_generation_dialog import SchemaGenerationDialog
+from xmleditor.collaboration_dialog import HostSessionDialog, JoinSessionDialog
 from xmleditor.xml_utils import XMLUtilities
 from xmleditor.theme_manager import ThemeManager, ThemeType
+
+
+# Configuration constants
+DEFAULT_USE_MONACO_EDITOR = True  # Use Monaco editor by default (supports collaboration)
 
 
 class MainWindow(QMainWindow):
@@ -37,6 +43,14 @@ class MainWindow(QMainWindow):
         
         # Load namespace display preference
         self.show_namespaces = self.settings.value("show_namespaces", False, type=bool)
+        
+        # Load editor preference (True for Monaco, False for QScintilla)
+        self.use_monaco_editor = self.settings.value("use_monaco_editor", DEFAULT_USE_MONACO_EDITOR, type=bool)
+        
+        # Track collaboration state
+        self.collaboration_active = False
+        self.collaboration_server = None
+        self.collaboration_room = None
             
         # Create timer for auto-refreshing tree view
         self.tree_refresh_timer = QTimer()
@@ -305,6 +319,30 @@ class MainWindow(QMainWindow):
             theme_action_group.addAction(action)
             theme_menu.addAction(action)
         
+        # Collaboration menu
+        collab_menu = menubar.addMenu("C&ollaboration")
+        
+        host_action = QAction("&Host Session...", self)
+        host_action.setShortcut(QKeySequence("Ctrl+Shift+H"))
+        host_action.setStatusTip("Host a collaboration session")
+        host_action.triggered.connect(self.host_collaboration_session)
+        collab_menu.addAction(host_action)
+        
+        join_action = QAction("&Join Session...", self)
+        join_action.setShortcut(QKeySequence("Ctrl+Shift+J"))
+        join_action.setStatusTip("Join a collaboration session")
+        join_action.triggered.connect(self.join_collaboration_session)
+        collab_menu.addAction(join_action)
+        
+        collab_menu.addSeparator()
+        
+        self.disconnect_action = QAction("&Disconnect", self)
+        self.disconnect_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
+        self.disconnect_action.setStatusTip("Disconnect from collaboration session")
+        self.disconnect_action.triggered.connect(self.disconnect_collaboration)
+        self.disconnect_action.setEnabled(False)
+        collab_menu.addAction(self.disconnect_action)
+        
         # Help menu
         help_menu = menubar.addMenu("&Help")
         
@@ -544,10 +582,18 @@ class MainWindow(QMainWindow):
     
     def create_editor_tab(self, title="Untitled", content="", file_path=None):
         """Create a new editor tab."""
-        editor = XMLEditor(theme_type=self.current_theme)
-        editor.textChanged.connect(self.on_text_changed)
-        if content:
-            editor.set_text(content)
+        if self.use_monaco_editor:
+            editor = MonacoEditor(theme_type=self.current_theme)
+            editor.textChanged.connect(self.on_text_changed)
+            editor.collaborationStatus.connect(self.on_collaboration_status)
+            editor.collaborationError.connect(self.on_collaboration_error)
+            if content:
+                editor.set_text(content)
+        else:
+            editor = XMLEditor(theme_type=self.current_theme)
+            editor.textChanged.connect(self.on_text_changed)
+            if content:
+                editor.set_text(content)
         
         index = self.tab_widget.addTab(editor, title)
         self.tab_widget.setCurrentIndex(index)
@@ -1210,7 +1256,132 @@ class MainWindow(QMainWindow):
             <li>XML formatting</li>
             <li>Find and replace</li>
             <li>Recent files</li>
+            <li>Real-time collaborative editing</li>
         </ul>
         <p>Built with Python and PyQt6</p>
         """
         QMessageBox.about(self, "About XML Editor", about_text)
+    
+    def host_collaboration_session(self):
+        """Host a collaboration session."""
+        editor = self.get_current_editor()
+        if not editor:
+            QMessageBox.warning(self, "No Editor", "Please open a document first.")
+            return
+        
+        if not isinstance(editor, MonacoEditor):
+            QMessageBox.warning(
+                self, "Not Supported", 
+                "Collaboration is only supported with Monaco editor.\n"
+                "The current document uses QScintilla editor."
+            )
+            return
+        
+        if self.collaboration_active:
+            QMessageBox.information(
+                self, "Already Connected",
+                "You are already in a collaboration session.\n"
+                "Disconnect first before hosting a new session."
+            )
+            return
+        
+        dialog = HostSessionDialog(self)
+        if dialog.exec():
+            server_url, room_name = dialog.get_connection_info()
+            
+            if not server_url or not room_name:
+                QMessageBox.warning(self, "Invalid Input", "Please provide both server URL and room name.")
+                return
+            
+            # Connect to collaboration
+            editor.connect_collaboration(server_url, room_name)
+            self.collaboration_server = server_url
+            self.collaboration_room = room_name
+            self.statusBar().showMessage(f"Hosting collaboration session: {room_name}")
+    
+    def join_collaboration_session(self):
+        """Join a collaboration session."""
+        editor = self.get_current_editor()
+        if not editor:
+            QMessageBox.warning(self, "No Editor", "Please open a document first.")
+            return
+        
+        if not isinstance(editor, MonacoEditor):
+            QMessageBox.warning(
+                self, "Not Supported",
+                "Collaboration is only supported with Monaco editor.\n"
+                "The current document uses QScintilla editor."
+            )
+            return
+        
+        if self.collaboration_active:
+            QMessageBox.information(
+                self, "Already Connected",
+                "You are already in a collaboration session.\n"
+                "Disconnect first before joining a new session."
+            )
+            return
+        
+        # Check for unsaved changes
+        tab_data = self.get_current_tab_data()
+        if tab_data and tab_data.get('is_modified', False):
+            reply = QMessageBox.question(
+                self, "Unsaved Changes",
+                "Joining a session will replace your current content.\n"
+                "Do you want to save your changes first?",
+                QMessageBox.StandardButton.Save | 
+                QMessageBox.StandardButton.Discard | 
+                QMessageBox.StandardButton.Cancel
+            )
+            
+            if reply == QMessageBox.StandardButton.Save:
+                self.save_file()
+            elif reply == QMessageBox.StandardButton.Cancel:
+                return
+        
+        dialog = JoinSessionDialog(self)
+        if dialog.exec():
+            server_url, room_name = dialog.get_connection_info()
+            
+            if not server_url or not room_name:
+                QMessageBox.warning(self, "Invalid Input", "Please provide both server URL and room name.")
+                return
+            
+            # Connect to collaboration
+            editor.connect_collaboration(server_url, room_name)
+            self.collaboration_server = server_url
+            self.collaboration_room = room_name
+            self.statusBar().showMessage(f"Joining collaboration session: {room_name}")
+    
+    def disconnect_collaboration(self):
+        """Disconnect from collaboration session."""
+        editor = self.get_current_editor()
+        if not editor or not isinstance(editor, MonacoEditor):
+            return
+        
+        editor.disconnect_collaboration()
+        self.collaboration_active = False
+        self.collaboration_server = None
+        self.collaboration_room = None
+        self.disconnect_action.setEnabled(False)
+        self.statusBar().showMessage("Disconnected from collaboration session")
+    
+    def on_collaboration_status(self, status):
+        """Handle collaboration status change."""
+        if status == 'connected':
+            self.collaboration_active = True
+            self.disconnect_action.setEnabled(True)
+            self.statusBar().showMessage(f"Connected to collaboration session: {self.collaboration_room}")
+        elif status == 'disconnected':
+            self.collaboration_active = False
+            self.disconnect_action.setEnabled(False)
+            self.statusBar().showMessage("Disconnected from collaboration session")
+    
+    def on_collaboration_error(self, error):
+        """Handle collaboration error."""
+        QMessageBox.critical(
+            self, "Collaboration Error",
+            f"An error occurred with the collaboration session:\n{error}"
+        )
+        self.collaboration_active = False
+        self.disconnect_action.setEnabled(False)

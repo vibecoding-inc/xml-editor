@@ -1,0 +1,12 @@
+name = "xml-editor-collab"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[durable_objects]
+bindings = [
+  { name = "DOC_ROOM", class_name = "DocumentRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["DocumentRoom"]

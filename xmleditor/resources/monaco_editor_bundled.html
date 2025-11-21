@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        #loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-size: 16px;
+        }
+        
+        #container {
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading Monaco Editor...</div>
+    <div id="container"></div>
+
+    <!-- QWebChannel for Python-JS communication -->
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    
+    <!-- Bundled Monaco Editor + Y.js (loaded from local file system) -->
+    <script>
+        // We'll load bundle.js dynamically from Python-provided path
+        console.log('[VERBOSE] Waiting for bundle.js path from Python...');
+    </script>
+    
+    <script>
+        console.log('[VERBOSE] Monaco editor HTML loaded');
+        
+        let monacoEditor = null;
+        let ydoc = null;
+        let provider = null;
+        let binding = null;
+        let backend = null;
+
+        // Initialize QWebChannel for Python communication
+        new QWebChannel(qt.webChannelTransport, function(channel) {
+            console.log('[VERBOSE] QWebChannel initialized');
+            backend = channel.objects.backend;
+            
+            // Get bundle path synchronously
+            const bundlePath = backend.getBundlePath();
+            console.log('[VERBOSE] Bundle path received:', bundlePath);
+            
+            // Load the bundle dynamically
+            const script = document.createElement('script');
+            script.src = bundlePath;
+            script.onload = function() {
+                console.log('[VERBOSE] Bundle loaded successfully');
+                initializeEditor();
+            };
+            script.onerror = function(error) {
+                console.error('[VERBOSE] Failed to load bundle:', error);
+                document.getElementById('loading').textContent = 'Error loading Monaco bundle: ' + bundlePath;
+                document.getElementById('loading').style.color = '#f48771';
+            };
+            document.head.appendChild(script);
+        });
+        
+        function initializeEditor() {
+            console.log('[VERBOSE] Starting editor initialization');
+            
+            try {
+                if (!window.monaco) {
+                    throw new Error('Monaco editor not loaded from bundle');
+                }
+                
+                console.log('[VERBOSE] Monaco available, creating editor');
+                
+                // Hide loading, show container
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('container').style.display = 'block';
+                
+                // Create Monaco editor
+                monacoEditor = window.monaco.editor.create(document.getElementById('container'), {
+                    value: '',
+                    language: 'xml',
+                    theme: 'vs-dark',
+                    automaticLayout: true,
+                    wordWrap: 'on',
+                    lineNumbers: 'on',
+                    minimap: { enabled: true },
+                    scrollBeyondLastLine: false,
+                    fontSize: 14,
+                    tabSize: 2,
+                    insertSpaces: true
+                });
+                
+                console.log('[VERBOSE] Monaco editor created successfully');
+                
+                // Set up content change listener
+                monacoEditor.onDidChangeModelContent(() => {
+                    if (backend && backend.onContentChanged) {
+                        const content = monacoEditor.getValue();
+                        backend.onContentChanged(content);
+                    }
+                });
+                
+                console.log('[VERBOSE] Content change listener registered');
+                
+                // Expose editor interface to window for Python access
+                window.monacoEditor = {
+                    getContent: function() {
+                        return monacoEditor.getValue();
+                    },
+                    setContent: function(text) {
+                        console.log('[VERBOSE] setContent called, text length:', text.length);
+                        monacoEditor.setValue(text);
+                    },
+                    setTheme: function(theme) {
+                        console.log('[VERBOSE] setTheme called:', theme);
+                        window.monaco.editor.setTheme(theme);
+                    },
+                    connectToCollaboration: function(serverUrl, roomName) {
+                        console.log('[VERBOSE] connectToCollaboration called');
+                        console.log('[VERBOSE] Server:', serverUrl, 'Room:', roomName);
+                        
+                        try {
+                            if (!window.Y || !window.WebsocketProvider || !window.MonacoBinding) {
+                                throw new Error('Y.js libraries not available from bundle');
+                            }
+                            
+                            // Create Y.js document
+                            ydoc = new window.Y.Doc();
+                            const ytext = ydoc.getText('monaco');
+                            
+                            // Create WebSocket provider
+                            provider = new window.WebsocketProvider(serverUrl, roomName, ydoc);
+                            
+                            // Bind Monaco to Y.js
+                            binding = new window.MonacoBinding(
+                                ytext,
+                                monacoEditor.getModel(),
+                                new Set([monacoEditor]),
+                                provider.awareness
+                            );
+                            
+                            console.log('[VERBOSE] Collaboration connected successfully');
+                            return true;
+                        } catch (error) {
+                            console.error('[VERBOSE] Collaboration connection error:', error);
+                            return false;
+                        }
+                    },
+                    disconnectFromCollaboration: function() {
+                        console.log('[VERBOSE] disconnectFromCollaboration called');
+                        
+                        try {
+                            if (binding) {
+                                binding.destroy();
+                                binding = null;
+                            }
+                            if (provider) {
+                                provider.destroy();
+                                provider = null;
+                            }
+                            if (ydoc) {
+                                ydoc.destroy();
+                                ydoc = null;
+                            }
+                            console.log('[VERBOSE] Collaboration disconnected successfully');
+                            return true;
+                        } catch (error) {
+                            console.error('[VERBOSE] Collaboration disconnection error:', error);
+                            return false;
+                        }
+                    }
+                };
+                
+                console.log('[VERBOSE] Window interface exposed');
+                console.log('[VERBOSE] Editor initialization complete');
+                
+            } catch (error) {
+                console.error('[VERBOSE] CRITICAL ERROR during initialization:', error);
+                document.getElementById('loading').textContent = 'Error loading editor: ' + error.message;
+                document.getElementById('loading').style.color = '#f48771';
+            }
+        }
+    </script>
+</body>
+</html>
