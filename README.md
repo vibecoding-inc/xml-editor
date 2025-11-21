@@ -1,5 +1,8 @@
 # XML Editor
 
+[![CI](https://github.com/profiluefter/xml-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/profiluefter/xml-editor/actions/workflows/ci.yml)
+[![Release](https://github.com/profiluefter/xml-editor/actions/workflows/release.yml/badge.svg)](https://github.com/profiluefter/xml-editor/actions/workflows/release.yml)
+
 A fully-featured cross-platform XML editor desktop application built with Python and PyQt6.
 
 ## Features
@@ -272,6 +275,30 @@ pyinstaller --name="XML-Editor" --windowed --onefile xmleditor/main.py
 # Or create a standalone executable with PyInstaller
 pip install pyinstaller
 pyinstaller --name="xml-editor" --onefile xmleditor/main.py
+```
+
+## CI/CD
+
+The project uses GitHub Actions for continuous integration and deployment. See [CI_CD.md](CI_CD.md) for detailed information about:
+
+- Automated testing on multiple platforms and Python versions
+- Nix flake checks including NixOS VM tests
+- Automated release builds for all platforms
+- Cross-platform package generation
+
+### Quick Reference
+
+```bash
+# Run tests locally
+python test_functionality.py
+python test_schema_generation.py
+
+# Run Nix checks (includes VM test)
+nix flake check
+
+# Build with Nix
+nix build .#gui
+nix build .#cli
 ```
 
 ## Contributing

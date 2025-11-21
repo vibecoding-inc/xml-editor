@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build release for'
+        required: true
+
+jobs:
+  build-python-packages:
+    name: Build Python Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+      
+      - name: Build package
+        run: python -m build
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-${{ matrix.os }}
+          path: dist/*
+
+  build-nix-packages:
+    name: Build Nix Package (${{ matrix.system }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        system: [x86_64-linux, aarch64-linux]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@v34
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+            extra-platforms = ${{ matrix.system }}
+      
+      - name: Set up Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+      
+      - name: Set up QEMU for cross-compilation
+        if: matrix.system == 'aarch64-linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      
+      - name: Build GUI package
+        run: |
+          nix build .#packages.${{ matrix.system }}.gui -L
+          mkdir -p dist-nix-${{ matrix.system }}
+          cp -rL result/* dist-nix-${{ matrix.system }}/
+      
+      - name: Build CLI package
+        run: |
+          nix build .#packages.${{ matrix.system }}.cli -L
+          cp -rL result/* dist-nix-${{ matrix.system }}/
+      
+      - name: Upload Nix artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nix-package-${{ matrix.system }}
+          path: dist-nix-${{ matrix.system }}/*
+
+  create-release-assets:
+    name: Create Release Assets
+    needs: [build-python-packages, build-nix-packages]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+      
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
