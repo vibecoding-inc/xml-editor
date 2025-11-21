@@ -31,16 +31,25 @@
     <div id="loading">Loading Monaco Editor...</div>
     <div id="container"></div>
     
-    <!-- Load Monaco Editor from CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
-    
-    <!-- Load Yjs and Y-Monaco bindings -->
-    <script src="https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/y-monaco@0.1.6/dist/y-monaco.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/y-websocket@1.5.0/dist/y-websocket.min.js"></script>
-    
     <!-- Load QWebChannel for Python communication -->
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    
+    <!-- Load Y.js and related libraries from CDN -->
+    <script src="https://unpkg.com/yjs@13.6.10/dist/yjs.cjs"></script>
+    <script src="https://unpkg.com/lib0@0.2.94/dist/index.cjs"></script>
+    <script src="https://unpkg.com/y-protocols@1.0.6/dist/awareness.cjs"></script>
+    <script src="https://unpkg.com/y-websocket@1.5.0/dist/y-websocket.cjs"></script>
+    <script src="https://unpkg.com/y-monaco@0.1.6/dist/y-monaco.cjs"></script>
+    
+    <!-- Configure and load Monaco Editor via AMD loader -->
+    <script>
+        var require = { 
+            paths: { 
+                'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' 
+            } 
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     
     <script>
         let editor = null;
@@ -58,51 +67,58 @@
             console.log('QWebChannel initialized');
         });
         
-        // Configure Monaco loader
-        require.config({ 
-            paths: { 
-                'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs'
-            }
-        });
-        
-        // Initialize Monaco Editor
+        // Load Monaco editor using AMD loader
         require(['vs/editor/editor.main'], function() {
-            editor = monaco.editor.create(document.getElementById('container'), {
-                value: '<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    \n</root>',
-                language: 'xml',
-                theme: currentTheme,
-                automaticLayout: true,
-                wordWrap: 'off',
-                minimap: { enabled: true },
-                scrollBeyondLastLine: false,
-                fontSize: 14,
-                fontFamily: 'Courier New, monospace',
-                lineNumbers: 'on',
-                renderWhitespace: 'selection',
-                folding: true,
-                bracketPairColorization: {
-                    enabled: true
+            try {
+                console.log('Initializing Monaco Editor...');
+                console.log('Monaco available:', typeof monaco !== 'undefined');
+                console.log('Y available:', typeof Y !== 'undefined');
+                
+                editor = monaco.editor.create(document.getElementById('container'), {
+                    value: '<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    \n</root>',
+                    language: 'xml',
+                    theme: currentTheme,
+                    automaticLayout: true,
+                    wordWrap: 'off',
+                    minimap: { enabled: true },
+                    scrollBeyondLastLine: false,
+                    fontSize: 14,
+                    fontFamily: 'Courier New, monospace',
+                    lineNumbers: 'on',
+                    renderWhitespace: 'selection',
+                    folding: true,
+                    bracketPairColorization: {
+                        enabled: true
+                    }
+                });
+                
+                isInitialized = true;
+                console.log('Monaco Editor initialized successfully');
+                document.getElementById('loading').style.display = 'none';
+                
+                // Initialize Yjs document only if Y is available
+                if (typeof Y !== 'undefined' && Y.Doc) {
+                    yDoc = new Y.Doc();
+                    yText = yDoc.getText('monaco');
+                    console.log('Y.js document initialized');
+                } else {
+                    console.warn('Y.js not available - collaboration features will be disabled');
                 }
-            });
-            
-            isInitialized = true;
-            console.log('Monaco Editor initialized');
-            document.getElementById('loading').style.display = 'none';
-            
-            // Initialize Yjs document
-            yDoc = new Y.Doc();
-            yText = yDoc.getText('monaco');
-            
-            // Set up content change listener to notify Python
-            editor.onDidChangeModelContent((event) => {
-                if (backend && backend.onContentChanged) {
-                    backend.onContentChanged(editor.getValue());
+                
+                // Set up content change listener to notify Python
+                editor.onDidChangeModelContent((event) => {
+                    if (backend && backend.onContentChanged) {
+                        backend.onContentChanged(editor.getValue());
+                    }
+                });
+                
+                // Notify Python that editor is ready
+                if (backend && backend.onEditorReady) {
+                    backend.onEditorReady();
                 }
-            });
-            
-            // Notify Python that editor is ready
-            if (backend && backend.onEditorReady) {
-                backend.onEditorReady();
+            } catch (error) {
+                console.error('Error initializing editor:', error);
+                document.getElementById('loading').textContent = 'Error loading editor: ' + error.message;
             }
         });
         
@@ -141,7 +157,7 @@
         // Function to connect to collaboration server
         function connectCollaboration(serverUrl, roomName) {
             if (!editor || !yDoc) {
-                console.error('Editor not initialized');
+                console.error('Editor or Y.js not initialized');
                 return false;
             }
             
@@ -156,6 +172,16 @@
                 if (binding) {
                     binding.destroy();
                     binding = null;
+                }
+                
+                // Check if MonacoBinding is available
+                if (typeof MonacoBinding === 'undefined') {
+                    throw new Error('MonacoBinding not available');
+                }
+                
+                // Check if WebsocketProvider is available  
+                if (typeof WebsocketProvider === 'undefined') {
+                    throw new Error('WebsocketProvider not available');
                 }
                 
                 // Create new Y-Monaco binding
