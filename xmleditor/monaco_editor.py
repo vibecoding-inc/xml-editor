@@ -22,21 +22,25 @@ class MonacoCallHandler(QObject):
     @pyqtSlot()
     def onEditorReady(self):
         """Called when Monaco editor is ready."""
+        print("[VERBOSE] Python: onEditorReady called")
         self.editorReady.emit()
     
     @pyqtSlot(str)
     def onContentChanged(self, content):
         """Called when editor content changes."""
+        print(f"[VERBOSE] Python: onContentChanged called, content length: {len(content)}")
         self.contentChanged.emit(content)
     
     @pyqtSlot(str)
     def onCollaborationStatus(self, status):
         """Called when collaboration status changes."""
+        print(f"[VERBOSE] Python: onCollaborationStatus called: {status}")
         self.collaborationStatus.emit(status)
     
     @pyqtSlot(str)
     def onCollaborationError(self, error):
         """Called when collaboration error occurs."""
+        print(f"[VERBOSE] Python: onCollaborationError called: {error}")
         self.collaborationError.emit(error)
 
 
@@ -65,6 +69,16 @@ class MonacoEditor(QWidget):
         
         # Create web view
         self.web_view = QWebEngineView()
+        
+        # Enable remote content loading
+        print("[VERBOSE] Python: Configuring web view settings...")
+        from PyQt6.QtWebEngineCore import QWebEngineSettings
+        settings = self.web_view.settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        print("[VERBOSE] Python: LocalContentCanAccessRemoteUrls enabled")
+        print("[VERBOSE] Python: LocalContentCanAccessFileUrls enabled")
+        
         layout.addWidget(self.web_view)
         
         # Set up web channel for Python-JS communication
@@ -84,35 +98,48 @@ class MonacoEditor(QWidget):
     
     def _load_monaco_editor(self):
         """Load the Monaco editor HTML."""
+        print("[VERBOSE] Python: Loading Monaco editor HTML...")
         # Get the path to the HTML file
         resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
         html_path = os.path.join(resources_dir, 'monaco_editor.html')
         
+        print(f"[VERBOSE] Python: Resources dir: {resources_dir}")
+        print(f"[VERBOSE] Python: HTML path: {html_path}")
+        print(f"[VERBOSE] Python: HTML file exists: {os.path.exists(html_path)}")
+        
         if os.path.exists(html_path):
             url = QUrl.fromLocalFile(html_path)
+            print(f"[VERBOSE] Python: Loading URL: {url.toString()}")
             self.web_view.setUrl(url)
         else:
+            print("[VERBOSE] Python: ERROR - HTML file not found!")
             # Fallback: load inline HTML
             self.web_view.setHtml('<html><body><h1>Monaco Editor not found</h1></body></html>')
     
     def _on_editor_ready(self):
         """Handle editor ready event."""
+        print("[VERBOSE] Python: _on_editor_ready called")
         self._is_ready = True
+        print(f"[VERBOSE] Python: Editor is now ready, pending content: {self._pending_content is not None}")
         
         # Apply pending operations
         if self._pending_content is not None:
+            print("[VERBOSE] Python: Applying pending content...")
             self._set_content_internal(self._pending_content)
             self._pending_content = None
         
         if self._pending_theme is not None:
+            print("[VERBOSE] Python: Applying pending theme...")
             self._set_theme_internal(self._pending_theme)
             self._pending_theme = None
         
+        print("[VERBOSE] Python: Emitting editorReady signal")
         self.editorReady.emit()
     
     def _on_content_changed(self, content):
         """Handle content changed event from editor."""
         self._current_content = content  # Update cached content
+        print(f"[VERBOSE] Python: Content changed, length: {len(content)}, suppress signal: {self._suppress_change_signal}")
         if not self._suppress_change_signal:
             self.textChanged.emit()
     

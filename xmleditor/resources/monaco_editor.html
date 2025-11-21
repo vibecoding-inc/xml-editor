@@ -24,6 +24,7 @@
             transform: translate(-50%, -50%);
             color: #888;
             font-family: sans-serif;
+            z-index: 1000;
         }
     </style>
 </head>
@@ -31,244 +32,239 @@
     <div id="loading">Loading Monaco Editor...</div>
     <div id="container"></div>
     
-    <!-- Load QWebChannel for Python communication -->
+    <!-- Load QWebChannel first -->
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
     
-    <!-- Configure and load Monaco Editor via AMD loader -->
+    <!-- Monaco Editor with AMD loader - inline to ensure it runs -->
     <script>
-        var require = {
+        console.log('[VERBOSE] Starting Monaco initialization...');
+        
+        // Set up AMD loader configuration BEFORE loading the loader
+        window.require = {
             paths: {
                 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs'
             }
         };
+        console.log('[VERBOSE] AMD config set');
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     
+    <!-- Load AMD loader from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js" 
+            onload="console.log('[VERBOSE] loader.js onload fired'); window.monacoLoaderReady = true;"
+            onerror="console.error('[VERBOSE] loader.js failed to load!')"></script>
+    
+    <!-- Wait for loader and initialize Monaco -->
     <script>
+        console.log('[VERBOSE] Setup script running');
+        
         let editor = null;
         let yDoc = null;
         let yText = null;
         let yProvider = null;
-        let binding = null;
         let backend = null;
         let currentTheme = 'vs-dark';
         let isInitialized = false;
         let yLibrariesLoaded = false;
         
-        // Initialize QWebChannel for Python communication
+        // Initialize QWebChannel
+        console.log('[VERBOSE] Initializing QWebChannel...');
         new QWebChannel(qt.webChannelTransport, function(channel) {
             backend = channel.objects.backend;
-            console.log('QWebChannel initialized');
+            console.log('[VERBOSE] QWebChannel initialized');
         });
         
-        // Load Y.js and related libraries dynamically AFTER Monaco is ready
+        // Load Y.js libraries
         function loadCollaborationLibraries() {
             return new Promise((resolve, reject) => {
-                console.log('Loading collaboration libraries...');
-                
-                // Load as ES modules to avoid AMD/CJS conflicts
-                const scriptUrls = [
-                    'https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.mjs',
-                    'https://cdn.jsdelivr.net/npm/y-websocket@1.5.0/dist/y-websocket.mjs'
-                ];
-                
-                Promise.all(scriptUrls.map(url => 
-                    import(url).catch(err => {
-                        console.error(`Failed to load ${url}:`, err);
-                        return null;
-                    })
-                )).then(modules => {
+                console.log('[VERBOSE] Loading Y.js...');
+                Promise.all([
+                    import('https://cdn.jsdelivr.net/npm/yjs@13.6.10/dist/yjs.mjs'),
+                    import('https://cdn.jsdelivr.net/npm/y-websocket@1.5.0/dist/y-websocket.mjs')
+                ]).then(modules => {
                     if (modules[0]) {
                         window.Y = modules[0];
-                        console.log('Y.js loaded');
+                        console.log('[VERBOSE] Y.js loaded');
                     }
                     if (modules[1]) {
                         window.WebsocketProvider = modules[1].WebsocketProvider;
-                        console.log('WebsocketProvider loaded');
+                        console.log('[VERBOSE] WebsocketProvider loaded');
                     }
-                    // Note: y-monaco doesn't have ES module build, skip for now
-                    // Collaboration will work for basic sync, just not with Monaco binding
                     yLibrariesLoaded = true;
                     resolve();
                 }).catch(reject);
             });
         }
         
-        // Use AMD require to load Monaco editor
-        require(['vs/editor/editor.main'], function() {
-            try {
-                console.log('Monaco Editor module loaded');
-                console.log('monaco available:', typeof monaco !== 'undefined');
-                
-                // Create the editor
-                editor = monaco.editor.create(document.getElementById('container'), {
-                    value: '<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    \n</root>',
-                    language: 'xml',
-                    theme: currentTheme,
-                    automaticLayout: true,
-                    wordWrap: 'off',
-                    minimap: { enabled: true },
-                    scrollBeyondLastLine: false,
-                    fontSize: 14,
-                    fontFamily: 'Courier New, monospace',
-                    lineNumbers: 'on',
-                    renderWhitespace: 'selection',
-                    folding: true,
-                    bracketPairColorization: {
-                        enabled: true
-                    }
-                });
-                
-                isInitialized = true;
-                console.log('Monaco Editor initialized successfully');
-                document.getElementById('loading').style.display = 'none';
-                
-                // Try to load collaboration libraries (non-blocking)
-                loadCollaborationLibraries().then(() => {
-                    if (window.Y && window.Y.Doc) {
-                        yDoc = new Y.Doc();
-                        yText = yDoc.getText('monaco');
-                        console.log('Y.js document initialized');
-                    }
-                }).catch(error => {
-                    console.warn('Collaboration libraries not available:', error);
-                    console.warn('Editor will work but collaboration features disabled');
-                });
-                
-                // Set up content change listener to notify Python
-                editor.onDidChangeModelContent((event) => {
-                    if (backend && backend.onContentChanged) {
-                        backend.onContentChanged(editor.getValue());
-                    }
-                });
-                
-                // Notify Python that editor is ready
-                if (backend && backend.onEditorReady) {
-                    backend.onEditorReady();
-                }
-            } catch (error) {
-                console.error('Error initializing editor:', error);
-                document.getElementById('loading').textContent = 'Error loading editor: ' + error.message;
+        // Initialize Monaco editor
+        function initializeMonaco() {
+            console.log('[VERBOSE] initializeMonaco called');
+            console.log('[VERBOSE] typeof require:', typeof require);
+            console.log('[VERBOSE] typeof define:', typeof define);
+            
+            if (typeof require !== 'function') {
+                console.error('[VERBOSE] ERROR: require is not a function after loader');
+                console.error('[VERBOSE] require =', require);
+                document.getElementById('loading').textContent = 'Error: AMD loader failed';
+                return;
             }
+            
+            console.log('[VERBOSE] Calling require([vs/editor/editor.main])');
+            
+            try {
+                require(['vs/editor/editor.main'], function() {
+                    console.log('[VERBOSE] Monaco module loaded');
+                    console.log('[VERBOSE] typeof monaco:', typeof monaco);
+                    
+                    if (typeof monaco === 'undefined') {
+                        console.error('[VERBOSE] ERROR: monaco undefined');
+                        document.getElementById('loading').textContent = 'Error: Monaco undefined';
+                        return;
+                    }
+                    
+                    console.log('[VERBOSE] Creating editor instance...');
+                    
+                    editor = monaco.editor.create(document.getElementById('container'), {
+                        value: '<?xml version="1.0" encoding="UTF-8"?>\n<root>\n    \n</root>',
+                        language: 'xml',
+                        theme: currentTheme,
+                        automaticLayout: true,
+                        wordWrap: 'off',
+                        minimap: { enabled: true },
+                        scrollBeyondLastLine: false,
+                        fontSize: 14,
+                        fontFamily: 'Courier New, monospace',
+                        lineNumbers: 'on',
+                        renderWhitespace: 'selection',
+                        folding: true,
+                        bracketPairColorization: { enabled: true }
+                    });
+                    
+                    isInitialized = true;
+                    console.log('[VERBOSE] ✓ Monaco Editor created successfully!');
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    // Load collaboration libraries
+                    loadCollaborationLibraries().then(() => {
+                        if (window.Y && window.Y.Doc) {
+                            yDoc = new Y.Doc();
+                            yText = yDoc.getText('monaco');
+                            console.log('[VERBOSE] Y.js initialized');
+                        }
+                    }).catch(err => console.warn('[VERBOSE] Collaboration unavailable:', err));
+                    
+                    // Set up listeners
+                    editor.onDidChangeModelContent((event) => {
+                        if (backend && backend.onContentChanged) {
+                            backend.onContentChanged(editor.getValue());
+                        }
+                    });
+                    
+                    // Notify Python
+                    if (backend && backend.onEditorReady) {
+                        backend.onEditorReady();
+                        console.log('[VERBOSE] Notified Python');
+                    }
+                }, function(err) {
+                    console.error('[VERBOSE] ERROR loading Monaco module:', err);
+                    document.getElementById('loading').textContent = 'Error loading Monaco: ' + err;
+                });
+            } catch (error) {
+                console.error('[VERBOSE] EXCEPTION:', error);
+                document.getElementById('loading').textContent = 'Exception: ' + error.message;
+            }
+        }
+        
+        // Wait for loader to be ready
+        function waitForLoader() {
+            console.log('[VERBOSE] Waiting for AMD loader...');
+            console.log('[VERBOSE] typeof require:', typeof require);
+            console.log('[VERBOSE] monacoLoaderReady:', window.monacoLoaderReady);
+            
+            if (typeof require === 'function') {
+                console.log('[VERBOSE] Loader ready!');
+                initializeMonaco();
+            } else if (window.monacoLoaderReady) {
+                console.log('[VERBOSE] Loader script loaded but require not function, retrying...');
+                setTimeout(waitForLoader, 200);
+            } else {
+                console.log('[VERBOSE] Waiting for loader script...');
+                setTimeout(waitForLoader, 200);
+            }
+        }
+        
+        // Start when page is loaded
+        window.addEventListener('load', function() {
+            console.log('[VERBOSE] Page loaded event');
+            setTimeout(waitForLoader, 300);
         });
         
-        // Function to get editor content
-        function getContent() {
-            if (editor) {
-                return editor.getValue();
-            }
-            return '';
-        }
-        
-        // Function to set editor content
-        function setContent(content) {
-            if (editor) {
-                editor.setValue(content);
-            }
-        }
-        
-        // Function to set theme
+        // API functions for Python
+        function getContent() { return editor ? editor.getValue() : ''; }
+        function setContent(content) { if (editor) editor.setValue(content); }
         function setTheme(theme) {
             if (editor) {
                 currentTheme = theme;
                 monaco.editor.setTheme(theme);
             }
         }
-        
-        // Function to set word wrap
         function setWordWrap(enabled) {
-            if (editor) {
-                editor.updateOptions({
-                    wordWrap: enabled ? 'on' : 'off'
-                });
-            }
+            if (editor) editor.updateOptions({ wordWrap: enabled ? 'on' : 'off' });
         }
         
-        // Function to connect to collaboration server
         function connectCollaboration(serverUrl, roomName) {
-            if (!editor || !yDoc) {
-                console.error('Editor or Y.js not initialized');
+            console.log('[VERBOSE] connectCollaboration:', serverUrl, roomName);
+            if (!editor || !yDoc || !yLibrariesLoaded) {
+                console.error('[VERBOSE] Not ready');
                 if (backend && backend.onCollaborationError) {
-                    backend.onCollaborationError('Editor or Y.js not initialized');
-                }
-                return false;
-            }
-            
-            if (!yLibrariesLoaded) {
-                console.error('Collaboration libraries not loaded yet');
-                if (backend && backend.onCollaborationError) {
-                    backend.onCollaborationError('Collaboration libraries not loaded');
+                    backend.onCollaborationError('Not ready');
                 }
                 return false;
             }
             
             try {
-                // Disconnect existing provider if any
-                if (yProvider) {
-                    yProvider.destroy();
-                    yProvider = null;
-                }
+                if (yProvider) yProvider.destroy();
                 
-                // Note: Without y-monaco binding, we can't sync editor changes
-                // This is a limitation of not having UMD builds
-                console.warn('Monaco binding not available - manual sync only');
-                
-                // Create WebSocket provider
                 if (window.WebsocketProvider) {
                     yProvider = new WebsocketProvider(
                         serverUrl.replace('http://', 'ws://').replace('https://', 'wss://'),
                         roomName,
                         yDoc
                     );
-                    
-                    console.log('Collaboration connected:', serverUrl, roomName);
-                    
+                    console.log('[VERBOSE] Connected');
                     if (backend && backend.onCollaborationStatus) {
                         backend.onCollaborationStatus('connected');
                     }
                     return true;
-                } else {
-                    throw new Error('WebsocketProvider not available');
                 }
             } catch (error) {
-                console.error('Failed to connect collaboration:', error);
+                console.error('[VERBOSE] Error:', error);
                 if (backend && backend.onCollaborationError) {
                     backend.onCollaborationError(error.toString());
                 }
-                return false;
             }
+            return false;
         }
         
-        // Function to disconnect from collaboration
         function disconnectCollaboration() {
             if (yProvider) {
                 yProvider.destroy();
                 yProvider = null;
-                console.log('Collaboration disconnected');
-                
+                console.log('[VERBOSE] Disconnected');
                 if (backend && backend.onCollaborationStatus) {
                     backend.onCollaborationStatus('disconnected');
                 }
             }
         }
         
-        // Function to check if collaboration is active
-        function isCollaborationActive() {
-            return yProvider !== null;
-        }
+        function isCollaborationActive() { return yProvider !== null; }
         
-        // Make functions available globally for Python to call
+        // Export API
         window.monacoEditor = {
-            getContent: getContent,
-            setContent: setContent,
-            setTheme: setTheme,
-            setWordWrap: setWordWrap,
-            connectCollaboration: connectCollaboration,
-            disconnectCollaboration: disconnectCollaboration,
-            isCollaborationActive: isCollaborationActive
+            getContent, setContent, setTheme, setWordWrap,
+            connectCollaboration, disconnectCollaboration, isCollaborationActive
         };
         
-        console.log('Monaco Editor interface ready');
+        console.log('[VERBOSE] Interface configured');
     </script>
 </body>
 </html>
