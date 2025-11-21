@@ -18,7 +18,7 @@
           
           src = ./xmleditor/resources/web;
           
-          npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          npmDepsHash = "sha256-/Dwd/fY4HidsYdC76Qg7wGqavPnDJhGPlW4dRdBttgg=";
           
           buildPhase = ''
             npm run build
