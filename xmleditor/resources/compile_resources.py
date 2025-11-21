@@ -1,8 +1,26 @@
 #!/usr/bin/env python3
-"""Compile Qt resource files."""
+"""Compile Qt resource files and prepare Monaco bundle."""
 import subprocess
 import sys
 import os
+import shutil
+
+def copy_monaco_bundle():
+    """Copy Monaco bundle from web/dist to resources."""
+    web_dist = os.path.join(os.path.dirname(__file__), 'web', 'dist')
+    resources_dist = os.path.join(os.path.dirname(__file__), 'dist')
+    
+    if os.path.exists(web_dist):
+        print(f"Copying Monaco bundle from {web_dist} to {resources_dist}")
+        if os.path.exists(resources_dist):
+            shutil.rmtree(resources_dist)
+        shutil.copytree(web_dist, resources_dist)
+        print(f"Monaco bundle copied successfully")
+        return True
+    else:
+        print(f"Warning: Monaco bundle not found at {web_dist}")
+        print("Run 'cd web && npm install && npm run build' first")
+        return False
 
 def compile_qrc():
     """Compile the .qrc file to Python."""
@@ -42,4 +60,10 @@ def getResourcePath(name):
         return True
 
 if __name__ == "__main__":
-    sys.exit(0 if compile_qrc() else 1)
+    # Copy Monaco bundle first
+    bundle_ok = copy_monaco_bundle()
+    
+    # Compile QRC
+    qrc_ok = compile_qrc()
+    
+    sys.exit(0 if (bundle_ok and qrc_ok) else 1)

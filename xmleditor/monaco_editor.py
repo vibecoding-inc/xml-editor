@@ -9,6 +9,13 @@ from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 from xmleditor.theme_manager import ThemeType
 
+# Import resources to register them
+try:
+    from xmleditor.resources import resources_rc
+    resources_rc.qInitResources()
+except ImportError:
+    pass
+
 
 class MonacoCallHandler(QObject):
     """Handler for callbacks from Monaco editor JavaScript."""
@@ -18,6 +25,16 @@ class MonacoCallHandler(QObject):
     editorReady = pyqtSignal()
     collaborationStatus = pyqtSignal(str)
     collaborationError = pyqtSignal(str)
+    
+    def __init__(self, bundle_path):
+        super().__init__()
+        self.bundle_path = bundle_path
+    
+    @pyqtSlot(result=str)
+    def getBundlePath(self):
+        """Return the path to the Monaco bundle."""
+        print(f"[VERBOSE] Python: getBundlePath called, returning: {self.bundle_path}")
+        return self.bundle_path
     
     @pyqtSlot()
     def onEditorReady(self):
@@ -81,9 +98,20 @@ class MonacoEditor(QWidget):
         
         layout.addWidget(self.web_view)
         
+        # Get the bundle path
+        resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
+        bundle_path = os.path.join(resources_dir, 'dist', 'bundle.js')
+        
+        # Convert to file:// URL
+        from PyQt6.QtCore import QUrl
+        bundle_url = QUrl.fromLocalFile(bundle_path).toString()
+        print(f"[VERBOSE] Python: Bundle path: {bundle_path}")
+        print(f"[VERBOSE] Python: Bundle URL: {bundle_url}")
+        print(f"[VERBOSE] Python: Bundle exists: {os.path.exists(bundle_path)}")
+        
         # Set up web channel for Python-JS communication
         self.channel = QWebChannel()
-        self.handler = MonacoCallHandler()
+        self.handler = MonacoCallHandler(bundle_url)
         self.channel.registerObject('backend', self.handler)
         self.web_view.page().setWebChannel(self.channel)
         
@@ -98,14 +126,14 @@ class MonacoEditor(QWidget):
     
     def _load_monaco_editor(self):
         """Load the Monaco editor HTML."""
-        print("[VERBOSE] Python: Loading Monaco editor HTML...")
-        # Get the path to the HTML file
-        resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
-        html_path = os.path.join(resources_dir, 'monaco_editor.html')
+        print("[VERBOSE] Python: Loading Monaco editor HTML (bundled version)...")
         
-        print(f"[VERBOSE] Python: Resources dir: {resources_dir}")
+        # Use file path instead of qrc for better compatibility
+        resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
+        html_path = os.path.join(resources_dir, 'monaco_editor_bundled.html')
+        
         print(f"[VERBOSE] Python: HTML path: {html_path}")
-        print(f"[VERBOSE] Python: HTML file exists: {os.path.exists(html_path)}")
+        print(f"[VERBOSE] Python: HTML exists: {os.path.exists(html_path)}")
         
         if os.path.exists(html_path):
             url = QUrl.fromLocalFile(html_path)
@@ -113,8 +141,7 @@ class MonacoEditor(QWidget):
             self.web_view.setUrl(url)
         else:
             print("[VERBOSE] Python: ERROR - HTML file not found!")
-            # Fallback: load inline HTML
-            self.web_view.setHtml('<html><body><h1>Monaco Editor not found</h1></body></html>')
+            self.web_view.setHtml('<html><body><h1 style="color: red;">Monaco Editor HTML not found</h1></body></html>')
     
     def _on_editor_ready(self):
         """Handle editor ready event."""

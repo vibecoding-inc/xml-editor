@@ -2,5 +2,6 @@
 <RCC version="1.0">
     <qresource prefix="/">
         <file>monaco_editor.html</file>
+        <file>monaco_editor_bundled.html</file>
     </qresource>
 </RCC>
