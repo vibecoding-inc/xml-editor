@@ -41,8 +41,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_ENV: ${{ github.event.inputs.environment || 'production' }}
         run: |
-          if [ "${{ github.event.inputs.environment }}" == "staging" ]; then
+          if [ "$DEPLOY_ENV" == "staging" ]; then
             echo "Deploying to staging environment"
             wrangler deploy --name xml-editor-collab-staging
           else
@@ -51,10 +52,12 @@ jobs:
           fi
       
       - name: Deployment Summary
+        env:
+          DEPLOY_ENV: ${{ github.event.inputs.environment || 'production' }}
         run: |
           echo "### Cloudflare Worker Deployment Complete! :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.environment }}" == "staging" ]; then
+          if [ "$DEPLOY_ENV" == "staging" ]; then
             echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
             echo "**Worker Name:** xml-editor-collab-staging" >> $GITHUB_STEP_SUMMARY
           else
