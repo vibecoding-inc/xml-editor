@@ -74,7 +74,9 @@ def take_screenshot():
             file_size = os.path.getsize(screenshot_path)
             print(f"✓ Screenshot file size: {file_size} bytes")
             
-            if file_size < 1000:
+            # Minimum expected size for a valid PNG screenshot (header + minimal content)
+            MIN_SCREENSHOT_SIZE = 1000  # bytes
+            if file_size < MIN_SCREENSHOT_SIZE:
                 print("✗ Warning: Screenshot file is suspiciously small")
             
             app.quit()
