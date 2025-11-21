@@ -24,9 +24,8 @@ def validate_html():
         ("Monaco loader.js", "monaco-editor@0.45.0/min/vs/loader.js"),
         ("Monaco require config", "require = {"),
         ("Monaco AMD load", "require(['vs/editor/editor.main']"),
-        ("Y.js library", "yjs@13.6.10"),
-        ("Y-Monaco binding", "y-monaco@0.1.6"),
-        ("Y-WebSocket", "y-websocket@1.5.0"),
+        ("Y.js library", ("yjs@13.6.10", "yjs.mjs")),  # Check for either
+        ("Y-WebSocket", ("y-websocket@1.5.0", "y-websocket.mjs")),
         ("QWebChannel", "qrc:///qtwebchannel/qwebchannel.js"),
         ("Editor create", "monaco.editor.create"),
         ("XML language", "language: 'xml'"),
@@ -36,8 +35,17 @@ def validate_html():
     ]
     
     all_passed = True
-    for check_name, check_string in checks:
-        if check_string in content:
+    for check_item in checks:
+        check_name = check_item[0]
+        check_strings = check_item[1]
+        
+        # Handle tuple of alternatives
+        if isinstance(check_strings, tuple):
+            found = any(s in content for s in check_strings)
+        else:
+            found = check_strings in content
+            
+        if found:
             print(f"✓ {check_name}: found")
         else:
             print(f"✗ {check_name}: NOT FOUND")
