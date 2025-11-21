@@ -181,6 +181,7 @@ print('✓ XML formatting works')
             python3
             python3Packages.pyqt6
             python3Packages.pyqt6-webengine
+            python3Packages.qscintilla-qt6
             python3Packages.lxml
             python3Packages.pygments
             python3Packages.setuptools

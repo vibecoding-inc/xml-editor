@@ -28,7 +28,7 @@ def take_screenshot():
     
     # Create editor
     print("Creating Monaco editor...")
-    editor = MonacoEditor(theme_type=ThemeType.DARK)
+    editor = MonacoEditor(theme_type=ThemeType.CATPPUCCIN_MOCHA)
     editor.setWindowTitle("XML Editor - Monaco Test")
     editor.resize(1200, 800)
     editor.show()
