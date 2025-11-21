@@ -15,11 +15,14 @@ def test_basename_with_none():
     # Simulate the original buggy code that would crash
     try:
         # This is what the code used to do - it would crash
+        # We EXPECT this to raise TypeError - that's the bug we're demonstrating
         file_path = None
         file_name_buggy = os.path.basename(file_path)
+        # If we reach here, the test failed because the bug didn't reproduce
         print(f"  ✗ Buggy code did not crash (unexpected): {file_name_buggy}")
         assert False, "Expected TypeError with buggy code"
     except TypeError as e:
+        # This is the expected behavior - the buggy code crashes
         print(f"  ✓ Buggy code crashes as expected: {e}")
     
     # Simulate the fixed code
