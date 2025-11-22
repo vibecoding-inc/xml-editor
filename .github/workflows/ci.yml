@@ -31,11 +31,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
       
-      - name: Run functionality tests
-        run: python test_functionality.py
-      
-      - name: Run schema generation tests
-        run: python test_schema_generation.py
+      - name: Run unit tests
+        run: python tests/run_tests.py unit
 
   test-nix:
     name: Nix Flake Checks
