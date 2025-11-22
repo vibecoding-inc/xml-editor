@@ -26,7 +26,8 @@ class TestBasenameWithNone(unittest.TestCase):
     
     def test_fixed_code_with_valid_path(self):
         """Test that the fix works with valid file paths."""
-        file_path = "/tmp/test_file.xml"
+        import tempfile
+        file_path = os.path.join(tempfile.gettempdir(), 'test_file.xml')
         file_name = os.path.basename(file_path) if file_path else 'Untitled'
         self.assertEqual(file_name, 'test_file.xml',
                         "Fixed code should extract basename for valid path")
@@ -63,7 +64,9 @@ class TestDictGetBehavior(unittest.TestCase):
     
     def test_proper_handling_with_valid_path(self):
         """Test proper handling when dict contains valid file path."""
-        tab_data = {'file_path': '/tmp/document.xml', 'is_modified': True}
+        import tempfile
+        path = os.path.join(tempfile.gettempdir(), 'document.xml')
+        tab_data = {'file_path': path, 'is_modified': True}
         
         file_path = tab_data.get('file_path')
         file_name = os.path.basename(file_path) if file_path else 'Untitled'

@@ -9,6 +9,28 @@ import os
 import sys
 
 
+class ConsoleCapturePage:
+    """Custom QWebEnginePage for capturing console output."""
+    
+    def __init__(self):
+        try:
+            from PyQt6.QtWebEngineCore import QWebEnginePage
+            self.QWebEnginePage = QWebEnginePage
+            super(ConsoleCapturePage, self).__init__()
+        except ImportError:
+            self.QWebEnginePage = None
+        self.console_messages = []
+    
+    def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
+        """Capture JavaScript console messages."""
+        self.console_messages.append({
+            'level': level,
+            'message': message,
+            'line': lineNumber,
+            'source': sourceID
+        })
+
+
 class TestConsoleOutput(unittest.TestCase):
     """Test console output capture from Monaco editor."""
     
@@ -37,7 +59,7 @@ class TestConsoleOutput(unittest.TestCase):
         self.app = QApplication.instance() or QApplication(sys.argv)
         
         # Create a custom console capture page
-        class ConsoleCapturePage(QWebEnginePage):
+        class TestConsoleCapturePage(QWebEnginePage):
             def __init__(self):
                 super().__init__()
                 self.console_messages = []
@@ -51,7 +73,7 @@ class TestConsoleOutput(unittest.TestCase):
                 })
         
         # Create the page
-        page = ConsoleCapturePage()
+        page = TestConsoleCapturePage()
         
         # Verify the page was created
         self.assertIsNotNone(page, "Console capture page should be created")
