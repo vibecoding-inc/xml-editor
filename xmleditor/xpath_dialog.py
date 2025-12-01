@@ -13,6 +13,8 @@ from xmleditor.xml_utils import XMLUtilities
 class XPathDialog(QDialog):
     """Dialog for executing XPath queries."""
     
+    SETTINGS_KEY_XPATH_EXPRESSION = "xpath_expression"
+    
     def __init__(self, xml_content: str, context_xpath: str = "", parent=None, settings: QSettings = None):
         super().__init__(parent)
         self.xml_content = xml_content
@@ -149,14 +151,14 @@ class XPathDialog(QDialog):
     def _load_xpath_expression(self):
         """Load the saved XPath expression from settings."""
         if self.settings:
-            saved_xpath = self.settings.value("xpath_expression", "")
-            if saved_xpath:
+            saved_xpath = self.settings.value(self.SETTINGS_KEY_XPATH_EXPRESSION, "")
+            if isinstance(saved_xpath, str) and saved_xpath.strip():
                 self.xpath_input.setText(saved_xpath)
     
     def _save_xpath_expression(self):
         """Save the current XPath expression to settings."""
         if self.settings:
-            self.settings.setValue("xpath_expression", self.xpath_input.text())
+            self.settings.setValue(self.SETTINGS_KEY_XPATH_EXPRESSION, self.xpath_input.text())
     
     def accept(self):
         """Override accept to save XPath expression before closing."""
