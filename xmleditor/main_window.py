@@ -904,7 +904,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Warning", "No content to query")
             return
         
-        dialog = XPathDialog(content, self)
+        # Get the selected node's XPath from the tree view
+        context_xpath = self.tree_view.get_selected_xpath()
+        
+        dialog = XPathDialog(content, context_xpath, self)
         dialog.exec()
         
     def show_xslt_dialog(self):

@@ -121,6 +121,38 @@ def test_xpath_scalar_functions():
     results = XMLUtilities.xpath_query(xml_content, "normalize-space(//book[1]/title)")
     print(f"  normalize-space(//book[1]/title): {results}")
     assert results == ["Learning XML"], f"normalize-space() should return ['Learning XML'], got {results}"
+
+def test_xpath_query_with_context():
+    """Test XPath query with context node."""
+    print("Testing XPath queries with context node...")
+    
+    # Query from first book as context
+    results = XMLUtilities.xpath_query(xml_content, "title/text()", "/bookstore/book[1]")
+    print(f"  Title of first book: {results}")
+    assert len(results) == 1, "Should find 1 title"
+    assert results[0] == "Learning XML", "Should be 'Learning XML'"
+    
+    # Query from second book as context
+    results = XMLUtilities.xpath_query(xml_content, "title/text()", "/bookstore/book[2]")
+    print(f"  Title of second book: {results}")
+    assert len(results) == 1, "Should find 1 title"
+    assert results[0] == "Everyday Italian", "Should be 'Everyday Italian'"
+    
+    # Query children from context
+    results = XMLUtilities.xpath_query(xml_content, "*", "/bookstore/book[1]")
+    print(f"  Number of child elements in first book: {len(results)}")
+    assert len(results) == 4, "Should find 4 child elements (title, author, year, price)"
+    
+    # Query with no context (should work as before)
+    results = XMLUtilities.xpath_query(xml_content, "//book/title/text()", "")
+    print(f"  Titles without context: {results}")
+    assert len(results) == 2, "Should find 2 titles"
+    
+    # Test relative path with context
+    results = XMLUtilities.xpath_query(xml_content, "@category", "/bookstore/book[1]")
+    print(f"  Category of first book: {results}")
+    assert len(results) == 1, "Should find 1 attribute"
+    assert results[0] == "web", "Should be 'web'"
     
     print()
 
@@ -154,6 +186,7 @@ if __name__ == "__main__":
         test_xsd_validation()
         test_xpath_query()
         test_xpath_scalar_functions()
+        test_xpath_query_with_context()
         test_xml_formatting()
         test_xml_tree_structure()
         
