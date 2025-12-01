@@ -129,20 +129,34 @@ class XMLUtilities:
             raise ValueError(f"XML formatting error: {str(e)}")
     
     @staticmethod
-    def xpath_query(xml_string: str, xpath_expr: str) -> List[str]:
+    def xpath_query(xml_string: str, xpath_expr: str, context_xpath: str = "") -> List[str]:
         """
         Execute XPath query on XML.
         
         Args:
             xml_string: XML content as string
             xpath_expr: XPath expression
+            context_xpath: Optional XPath to select the context node (defaults to document root)
             
         Returns:
             List of matching results as strings
         """
         try:
             tree = etree.fromstring(xml_string.encode('utf-8'))
-            results = tree.xpath(xpath_expr)
+            
+            # Determine the context node
+            if context_xpath:
+                context_nodes = tree.xpath(context_xpath)
+                if not context_nodes:
+                    raise ValueError(f"Context node not found: {context_xpath}")
+                # Check if result is an element (can execute xpath on it)
+                if not hasattr(context_nodes[0], 'xpath'):
+                    raise ValueError(f"Context XPath must select an element: {context_xpath}")
+                context_node = context_nodes[0]
+            else:
+                context_node = tree
+            
+            results = context_node.xpath(xpath_expr)
             
             output = []
             for result in results:
