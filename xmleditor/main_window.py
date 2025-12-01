@@ -907,7 +907,7 @@ class MainWindow(QMainWindow):
         # Get the selected node's XPath from the tree view
         context_xpath = self.tree_view.get_selected_xpath()
         
-        dialog = XPathDialog(content, context_xpath, self)
+        dialog = XPathDialog(content, context_xpath, self, self.settings)
         dialog.exec()
         
     def show_xslt_dialog(self):

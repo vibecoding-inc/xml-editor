@@ -5,7 +5,7 @@ XPath query dialog for searching XML documents.
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                               QLineEdit, QPushButton, QTextEdit, QMessageBox,
                               QFrame)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QFont
 from xmleditor.xml_utils import XMLUtilities
 
@@ -13,11 +13,13 @@ from xmleditor.xml_utils import XMLUtilities
 class XPathDialog(QDialog):
     """Dialog for executing XPath queries."""
     
-    def __init__(self, xml_content: str, context_xpath: str = "", parent=None):
+    def __init__(self, xml_content: str, context_xpath: str = "", parent=None, settings: QSettings = None):
         super().__init__(parent)
         self.xml_content = xml_content
         self.context_xpath = context_xpath
+        self.settings = settings
         self.init_ui()
+        self._load_xpath_expression()
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -143,3 +145,25 @@ class XPathDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"XPath query failed:\n{str(e)}")
             self.results_display.setPlainText(f"Error: {str(e)}")
+    
+    def _load_xpath_expression(self):
+        """Load the saved XPath expression from settings."""
+        if self.settings:
+            saved_xpath = self.settings.value("xpath_expression", "")
+            if saved_xpath:
+                self.xpath_input.setText(saved_xpath)
+    
+    def _save_xpath_expression(self):
+        """Save the current XPath expression to settings."""
+        if self.settings:
+            self.settings.setValue("xpath_expression", self.xpath_input.text())
+    
+    def accept(self):
+        """Override accept to save XPath expression before closing."""
+        self._save_xpath_expression()
+        super().accept()
+    
+    def reject(self):
+        """Override reject to save XPath expression before closing."""
+        self._save_xpath_expression()
+        super().reject()
