@@ -158,6 +158,15 @@ class XMLUtilities:
             
             results = context_node.xpath(xpath_expr)
             
+            # Handle non-iterable XPath results (float, bool, string)
+            # XPath functions like count(), sum(), boolean(), string(), etc.
+            # return scalar values instead of node sets
+            if isinstance(results, (float, bool)):
+                return [str(results)]
+            if isinstance(results, str):
+                return [results] if results else []
+            
+            # Handle iterable results (node sets)
             output = []
             for result in results:
                 if isinstance(result, etree._Element):

@@ -82,6 +82,46 @@ def test_xpath_query():
     assert len(results) == 1, "Should find 1 web book"
     print()
 
+
+def test_xpath_scalar_functions():
+    """Test XPath functions that return scalar values (float, bool, string)."""
+    print("Testing XPath scalar functions...")
+    
+    # Test count() - returns float
+    results = XMLUtilities.xpath_query(xml_content, "count(//book)")
+    print(f"  count(//book): {results}")
+    assert results == ["2.0"], f"count(//book) should return ['2.0'], got {results}"
+    
+    # Test sum() - returns float
+    results = XMLUtilities.xpath_query(xml_content, "sum(//book/year)")
+    print(f"  sum(//book/year): {results}")
+    assert results == ["4008.0"], f"sum(//book/year) should return ['4008.0'], got {results}"
+    
+    # Test boolean() - returns bool
+    results = XMLUtilities.xpath_query(xml_content, "boolean(//book)")
+    print(f"  boolean(//book): {results}")
+    assert results == ["True"], f"boolean(//book) should return ['True'], got {results}"
+    
+    # Test string() - returns string
+    results = XMLUtilities.xpath_query(xml_content, "string(//book/title)")
+    print(f"  string(//book/title): {results}")
+    assert results == ["Learning XML"], f"string(//book/title) should return ['Learning XML'], got {results}"
+    
+    # Test contains() - returns bool
+    results = XMLUtilities.xpath_query(xml_content, "contains(//book[1]/title, 'XML')")
+    print(f"  contains(//book[1]/title, 'XML'): {results}")
+    assert results == ["True"], f"contains() should return ['True'], got {results}"
+    
+    # Test string-length() - returns float
+    results = XMLUtilities.xpath_query(xml_content, "string-length(//book[1]/title)")
+    print(f"  string-length(//book[1]/title): {results}")
+    assert results == ["12.0"], f"string-length() should return ['12.0'], got {results}"
+    
+    # Test normalize-space() - returns string
+    results = XMLUtilities.xpath_query(xml_content, "normalize-space(//book[1]/title)")
+    print(f"  normalize-space(//book[1]/title): {results}")
+    assert results == ["Learning XML"], f"normalize-space() should return ['Learning XML'], got {results}"
+
 def test_xpath_query_with_context():
     """Test XPath query with context node."""
     print("Testing XPath queries with context node...")
@@ -145,6 +185,7 @@ if __name__ == "__main__":
         test_xml_validation()
         test_xsd_validation()
         test_xpath_query()
+        test_xpath_scalar_functions()
         test_xpath_query_with_context()
         test_xml_formatting()
         test_xml_tree_structure()
