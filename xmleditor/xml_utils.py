@@ -149,7 +149,8 @@ class XMLUtilities:
                 context_nodes = tree.xpath(context_xpath)
                 if not context_nodes:
                     raise ValueError(f"Context node not found: {context_xpath}")
-                if not isinstance(context_nodes[0], etree._Element):
+                # Check if result is an element (can execute xpath on it)
+                if not hasattr(context_nodes[0], 'xpath'):
                     raise ValueError(f"Context XPath must select an element: {context_xpath}")
                 context_node = context_nodes[0]
             else:

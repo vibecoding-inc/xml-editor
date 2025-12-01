@@ -38,9 +38,10 @@ class XPathDialog(QDialog):
             context_layout = QHBoxLayout(self.context_frame)
             context_layout.setContentsMargins(8, 4, 8, 4)
             
-            # Icon/indicator
-            context_icon = QLabel("📍")
-            context_icon.setFixedWidth(24)
+            # Icon/indicator - using text for better accessibility
+            context_icon = QLabel("●")
+            context_icon.setStyleSheet("color: #1565c0; font-size: 14px;")
+            context_icon.setFixedWidth(20)
             context_layout.addWidget(context_icon)
             
             # Context info
