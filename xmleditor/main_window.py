@@ -508,7 +508,7 @@ class MainWindow(QMainWindow):
         tab_data = self.tab_data.get(index, {})
         if tab_data.get('is_modified', False):
             editor = self.tab_widget.widget(index)
-            file_name = os.path.basename(tab_data.get('file_path', 'Untitled'))
+            file_name = os.path.basename(tab_data.get('file_path') or 'Untitled')
             
             reply = QMessageBox.question(
                 self, "Unsaved Changes",
