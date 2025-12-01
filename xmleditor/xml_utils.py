@@ -147,7 +147,7 @@ class XMLUtilities:
             # Handle non-iterable XPath results (float, bool, string)
             # XPath functions like count(), sum(), boolean(), string(), etc.
             # return scalar values instead of node sets
-            if isinstance(results, (float, int, bool)):
+            if isinstance(results, (float, bool)):
                 return [str(results)]
             if isinstance(results, str):
                 return [results] if results else []
