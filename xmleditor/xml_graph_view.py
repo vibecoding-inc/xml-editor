@@ -150,6 +150,10 @@ class XMLNodeItem(QGraphicsRectItem):
         # Make item movable and selectable
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
+        
+        # Track connected lines for updating when moved
+        self.connected_lines: List[Any] = []
         
         # Set Z value based on depth (higher depth = on top)
         self.setZValue(depth)
@@ -163,6 +167,23 @@ class XMLNodeItem(QGraphicsRectItem):
             for k, v in attributes.items():
                 tooltip += f"\n  {k}={v}"
         self.setToolTip(tooltip)
+    
+    def add_connected_line(self, line):
+        """Add a line that is connected to this node."""
+        if line not in self.connected_lines:
+            self.connected_lines.append(line)
+    
+    def itemChange(self, change, value):
+        """Handle item changes, updating connected lines when moved."""
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            # Update all connected lines when position changes
+            for line in self.connected_lines:
+                if hasattr(line, 'update_position'):
+                    line.update_position()
+            # Also update nesting container if present
+            if self.nesting_container and hasattr(self.nesting_container, 'update_position'):
+                self.nesting_container.update_position()
+        return super().itemChange(change, value)
     
     def set_as_key(self):
         """Mark this node as a key element."""
@@ -211,6 +232,10 @@ class ConnectionLine(QGraphicsPathItem):
         self.parent_node = parent_node
         self.child_node = child_node
         
+        # Register this line with connected nodes for position updates
+        parent_node.add_connected_line(self)
+        child_node.add_connected_line(self)
+        
         # Set up appearance - color based on parent depth
         color_index = parent_node.depth % len(DEPTH_COLORS)
         line_color = DEPTH_COLORS[color_index].darker(110)
@@ -249,6 +274,10 @@ class KeyReferenceLine(QGraphicsPathItem):
         self.key_node = key_node
         self.keyref_node = keyref_node
         self.key_name = key_name
+        
+        # Register this line with connected nodes for position updates
+        key_node.add_connected_line(self)
+        keyref_node.add_connected_line(self)
         
         # Set up appearance - red/pink dashed line for key references
         pen = QPen(KEY_REFERENCE_COLOR, 3, Qt.PenStyle.DashLine)
@@ -361,9 +390,12 @@ class XMLGraphScene(QGraphicsScene):
             # Create nesting containers to highlight parent-child relationships
             self._create_nesting_containers(root_node)
             
-            # If schema provided and in data mode, parse and highlight key references
-            if schema_content and self.view_mode == "data":
-                self._apply_key_references(tree, schema_content)
+            # Apply key references based on view mode
+            if schema_content:
+                if self.view_mode == "data":
+                    self._apply_key_references(tree, schema_content)
+                else:  # types mode
+                    self._apply_type_key_references(schema_content)
             
             # Adjust scene rect to fit all items
             self.setSceneRect(self.itemsBoundingRect().adjusted(-50, -50, 50, 50))
@@ -630,6 +662,103 @@ class XMLGraphScene(QGraphicsScene):
             if node.xpath:
                 node_map[node.xpath] = node
         return node_map
+    
+    def _apply_type_key_references(self, schema_content: str):
+        """
+        Apply key/keyref highlighting in Types view mode.
+        Links element types based on schema key/keyref definitions.
+        e.g., authorRef type links to author type.
+        """
+        try:
+            schema_tree = etree.fromstring(schema_content.encode('utf-8'))
+            
+            # XSD namespace
+            xs_ns = '{http://www.w3.org/2001/XMLSchema}'
+            
+            # Helper to extract element type name from xpath
+            def extract_element_type(xpath: str) -> str:
+                """Extract the last element name from an xpath."""
+                # Remove prefixes like .// and ./
+                xpath = xpath.replace('.//', '').replace('./', '')
+                # Get last segment (e.g., "authors/author" -> "author")
+                parts = xpath.split('/')
+                last_part = parts[-1] if parts else xpath
+                # Remove attribute prefix if present (e.g., "@id" -> "id")
+                if last_part.startswith('@'):
+                    return ""  # Attribute, not an element
+                return last_part
+            
+            # Find all key and keyref definitions to extract element type names
+            keys = {}  # name -> selector element type name
+            keyrefs = []  # list of {name, refer, keyref_type, field_type}
+            
+            for key_elem in schema_tree.iter(f'{xs_ns}key'):
+                key_name = key_elem.get('name')
+                selector = key_elem.find(f'{xs_ns}selector')
+                if key_name and selector is not None:
+                    selector_xpath = selector.get('xpath', '')
+                    key_type = extract_element_type(selector_xpath)
+                    if key_type:
+                        keys[key_name] = key_type
+            
+            for keyref_elem in schema_tree.iter(f'{xs_ns}keyref'):
+                keyref_name = keyref_elem.get('name')
+                refer = keyref_elem.get('refer')
+                selector = keyref_elem.find(f'{xs_ns}selector')
+                field = keyref_elem.find(f'{xs_ns}field')
+                
+                if keyref_name and refer and selector is not None and field is not None:
+                    selector_xpath = selector.get('xpath', '')
+                    field_xpath = field.get('xpath', '')
+                    
+                    # Extract element type names
+                    keyref_type = extract_element_type(selector_xpath)
+                    # Field element that contains the reference (e.g., "authorRef")
+                    field_type = extract_element_type(field_xpath)
+                    
+                    if keyref_type and field_type:
+                        keyrefs.append({
+                            'name': keyref_name,
+                            'refer': refer,
+                            'keyref_type': keyref_type,
+                            'field_type': field_type
+                        })
+            
+            # Build a map from element type name to type node
+            type_node_map = {}
+            for node in self.nodes:
+                type_node_map[node.tag] = node
+            
+            # Apply highlighting and create reference lines
+            for keyref_info in keyrefs:
+                refer = keyref_info['refer']
+                if refer not in keys:
+                    continue
+                
+                key_type = keys[refer]
+                field_type = keyref_info['field_type']
+                
+                # Find the nodes
+                key_node = type_node_map.get(key_type)
+                keyref_node = type_node_map.get(field_type)
+                
+                if key_node and keyref_node:
+                    # Highlight nodes
+                    key_node.set_as_key()
+                    keyref_node.set_as_keyref()
+                    
+                    # Create reference line between type nodes
+                    ref_line = KeyReferenceLine(
+                        key_node, keyref_node,
+                        f"{field_type} → {key_type}"
+                    )
+                    self.addItem(ref_line)
+                    self.key_references.append(ref_line)
+                    
+        except etree.XMLSyntaxError:
+            pass  # Schema parsing error
+        except Exception:
+            pass  # Other errors
     
     def _extract_tag_name(self, element: etree._Element, show_namespaces: bool) -> str:
         """Extract the tag name from an element, handling namespaces."""
