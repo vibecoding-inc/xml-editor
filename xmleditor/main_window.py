@@ -535,6 +535,20 @@ class MainWindow(QMainWindow):
         
         toolbar_layout.addWidget(self._create_separator())
         
+        # View mode toggle (Data vs Types)
+        view_mode_label = QLabel("View:")
+        view_mode_label.setStyleSheet("font-size: 10px;")
+        toolbar_layout.addWidget(view_mode_label)
+        
+        self.graph_view_mode_combo = QComboBox()
+        self.graph_view_mode_combo.addItems(["Data", "Types"])
+        self.graph_view_mode_combo.setMaximumWidth(70)
+        self.graph_view_mode_combo.setToolTip("Data: show all XML elements\nTypes: show unique element types (schema-like)")
+        self.graph_view_mode_combo.currentIndexChanged.connect(self.on_graph_view_mode_changed)
+        toolbar_layout.addWidget(self.graph_view_mode_combo)
+        
+        toolbar_layout.addWidget(self._create_separator())
+        
         # Display checkboxes
         self.show_connections_cb = QCheckBox("Lines")
         self.show_connections_cb.setChecked(True)
@@ -601,6 +615,13 @@ class MainWindow(QMainWindow):
         layout_names = ["tree_vertical", "tree_horizontal", "radial", "compact"]
         if index < len(layout_names):
             self.graph_view.set_layout_algorithm(layout_names[index])
+            self.refresh_graph_view()
+    
+    def on_graph_view_mode_changed(self, index):
+        """Handle view mode change (Data vs Types)."""
+        view_modes = ["data", "types"]
+        if index < len(view_modes):
+            self.graph_view.set_view_mode(view_modes[index])
             self.refresh_graph_view()
     
     def on_graph_display_changed(self):

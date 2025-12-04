@@ -304,10 +304,15 @@ class XMLGraphScene(QGraphicsScene):
         self.nesting_padding = 15  # Padding for nesting containers
         self.schema_content: Optional[str] = None  # Store schema for key analysis
         self.layout_algorithm: str = "tree_vertical"  # Default layout
+        self.view_mode: str = "data"  # "data" or "types"
     
     def set_layout_algorithm(self, algorithm: str):
         """Set the layout algorithm to use."""
         self.layout_algorithm = algorithm
+    
+    def set_view_mode(self, mode: str):
+        """Set the view mode: 'data' for actual data, 'types' for type structure."""
+        self.view_mode = mode
     
     def clear_graph(self):
         """Clear all nodes and connections from the scene."""
@@ -333,8 +338,12 @@ class XMLGraphScene(QGraphicsScene):
         try:
             tree = etree.fromstring(xml_content.encode('utf-8'))
             
-            # Build the graph
-            root_node = self._create_node_recursive(tree, show_namespaces, 0, tree)
+            if self.view_mode == "types":
+                # Build type tree visualization
+                root_node = self._create_type_tree(tree, show_namespaces)
+            else:
+                # Build the regular data graph
+                root_node = self._create_node_recursive(tree, show_namespaces, 0, tree)
             
             # Calculate layout based on selected algorithm
             if self.layout_algorithm == "tree_horizontal":
@@ -352,8 +361,8 @@ class XMLGraphScene(QGraphicsScene):
             # Create nesting containers to highlight parent-child relationships
             self._create_nesting_containers(root_node)
             
-            # If schema provided, parse and highlight key references
-            if schema_content:
+            # If schema provided and in data mode, parse and highlight key references
+            if schema_content and self.view_mode == "data":
                 self._apply_key_references(tree, schema_content)
             
             # Adjust scene rect to fit all items
@@ -363,6 +372,114 @@ class XMLGraphScene(QGraphicsScene):
             # Show error message in scene
             error_text = self.addText(f"Error: {str(e)}")
             error_text.setDefaultTextColor(QColor(255, 0, 0))
+    
+    def _analyze_type_structure(self, root: etree._Element) -> Dict[str, Dict]:
+        """
+        Analyze XML elements to build a type structure tree.
+        Similar to schema generation analysis but returns a simpler tree structure.
+        
+        Args:
+            root: Root element of XML tree
+            
+        Returns:
+            Dictionary mapping element tags to their child types and attributes
+        """
+        type_info = {}
+        
+        def analyze_element(element):
+            tag = element.tag
+            # Handle namespace in tag
+            if isinstance(tag, str) and tag.startswith('{'):
+                tag = tag.split('}', 1)[-1]
+            
+            if tag not in type_info:
+                type_info[tag] = {
+                    'children': set(),
+                    'attributes': set(),
+                    'has_text': False
+                }
+            
+            info = type_info[tag]
+            
+            # Collect attributes
+            for attr_name in element.attrib.keys():
+                info['attributes'].add(attr_name)
+            
+            # Check for text content
+            if element.text and element.text.strip():
+                info['has_text'] = True
+            
+            # Analyze children
+            for child in element:
+                child_tag = child.tag
+                if isinstance(child_tag, str) and child_tag.startswith('{'):
+                    child_tag = child_tag.split('}', 1)[-1]
+                info['children'].add(child_tag)
+                analyze_element(child)
+        
+        analyze_element(root)
+        return type_info
+    
+    def _create_type_tree(self, tree: etree._Element, show_namespaces: bool) -> XMLNodeItem:
+        """
+        Create a type tree visualization showing unique element types and their relationships.
+        
+        Args:
+            tree: Parsed XML tree
+            show_namespaces: Whether to show namespace prefixes
+            
+        Returns:
+            Root XMLNodeItem for the type tree
+        """
+        # Analyze the type structure
+        type_info = self._analyze_type_structure(tree)
+        
+        # Get root tag
+        root_tag = tree.tag
+        if isinstance(root_tag, str) and root_tag.startswith('{'):
+            root_tag = root_tag.split('}', 1)[-1]
+        
+        # Build the type tree starting from root
+        created_nodes = {}
+        
+        def create_type_node(tag: str, depth: int, parent_tag: str = None) -> XMLNodeItem:
+            # Create a unique key for this context (to handle same type at different levels)
+            context_key = f"{parent_tag}->{tag}" if parent_tag else tag
+            
+            if context_key in created_nodes:
+                return created_nodes[context_key]
+            
+            info = type_info.get(tag, {'children': set(), 'attributes': set(), 'has_text': False})
+            
+            # Build attributes dict for display
+            attrs = {attr: "" for attr in info['attributes']}
+            
+            # Create text description
+            text = ""
+            child_count = len(info['children'])
+            if child_count > 0:
+                text = f"({child_count} child types)"
+            elif info['has_text']:
+                text = "(text content)"
+            
+            # Create the node
+            node = XMLNodeItem(tag, text, attrs, depth)
+            self.addItem(node)
+            self.nodes.append(node)
+            created_nodes[context_key] = node
+            
+            # Create child type nodes
+            for child_tag in sorted(info['children']):
+                child_node = create_type_node(child_tag, depth + 1, tag)
+                if child_node not in node.child_nodes:
+                    child_node.parent_node = node
+                    node.child_nodes.append(child_node)
+            
+            return node
+        
+        root_node = create_type_node(root_tag, 0)
+        return root_node
+    
     
     def _apply_key_references(self, xml_tree: etree._Element, schema_content: str):
         """Parse schema and apply key/keyref highlighting to nodes."""
@@ -759,6 +876,7 @@ class XMLGraphView(QGraphicsView):
         self.setScene(self.graph_scene)
         self.schema_content: Optional[str] = None  # Store schema for key highlighting
         self.layout_algorithm: str = "tree_vertical"  # Current layout algorithm
+        self.view_mode: str = "data"  # "data" or "types"
         
         # Display options
         self.show_connections = True
@@ -790,6 +908,11 @@ class XMLGraphView(QGraphicsView):
         """Set the layout algorithm to use."""
         self.layout_algorithm = algorithm
         self.graph_scene.set_layout_algorithm(algorithm)
+    
+    def set_view_mode(self, mode: str):
+        """Set the view mode: 'data' for actual data, 'types' for type structure."""
+        self.view_mode = mode
+        self.graph_scene.set_view_mode(mode)
     
     def set_display_options(self, show_connections: bool = True, 
                            show_nesting: bool = True, show_keyrefs: bool = True):
