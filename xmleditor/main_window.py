@@ -505,7 +505,7 @@ class MainWindow(QMainWindow):
         info_label.setStyleSheet("color: gray; font-size: 10px; padding: 5px;")
         graph_layout.addWidget(info_label)
         
-        # Add control buttons
+        # Add control buttons row
         button_layout = QHBoxLayout()
         
         refresh_btn = QPushButton("Refresh")
@@ -519,6 +519,33 @@ class MainWindow(QMainWindow):
         button_layout.addStretch()
         graph_layout.addLayout(button_layout)
         
+        # Add schema file picker row for key/keyref highlighting
+        schema_layout = QHBoxLayout()
+        
+        schema_label = QLabel("Schema (for key refs):")
+        schema_label.setStyleSheet("font-size: 10px;")
+        schema_layout.addWidget(schema_label)
+        
+        self.graph_schema_path_label = QLabel("No schema loaded")
+        self.graph_schema_path_label.setStyleSheet("color: gray; font-style: italic; font-size: 10px;")
+        schema_layout.addWidget(self.graph_schema_path_label, 1)
+        
+        load_schema_btn = QPushButton("Load Schema...")
+        load_schema_btn.setMaximumWidth(100)
+        load_schema_btn.clicked.connect(self.load_graph_schema)
+        schema_layout.addWidget(load_schema_btn)
+        
+        clear_schema_btn = QPushButton("Clear")
+        clear_schema_btn.setMaximumWidth(60)
+        clear_schema_btn.clicked.connect(self.clear_graph_schema)
+        schema_layout.addWidget(clear_schema_btn)
+        
+        graph_layout.addLayout(schema_layout)
+        
+        # Store schema file path and content
+        self.graph_schema_file_path = None
+        self.graph_schema_content = None
+        
         # Create graph view
         self.graph_view = XMLGraphView()
         graph_layout.addWidget(self.graph_view)
@@ -526,6 +553,45 @@ class MainWindow(QMainWindow):
         self.graph_dock.setWidget(graph_widget)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.graph_dock)
         self.graph_dock.hide()
+    
+    def load_graph_schema(self):
+        """Load XSD schema for key/keyref highlighting in graph view."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Load Schema for Key References", "", 
+            "XSD Schema Files (*.xsd);;All Files (*)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    self.graph_schema_content = f.read()
+                
+                self.graph_schema_file_path = file_path
+                self.graph_schema_path_label.setText(os.path.basename(file_path))
+                self.graph_schema_path_label.setToolTip(file_path)
+                self.graph_schema_path_label.setStyleSheet("color: green; font-style: normal; font-size: 10px;")
+                
+                # Update graph view with schema
+                self.graph_view.set_schema(self.graph_schema_content)
+                self.refresh_graph_view()
+                
+                self.statusBar().showMessage(f"Schema loaded: {os.path.basename(file_path)}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load schema:\n{str(e)}")
+    
+    def clear_graph_schema(self):
+        """Clear the loaded graph schema."""
+        self.graph_schema_file_path = None
+        self.graph_schema_content = None
+        self.graph_schema_path_label.setText("No schema loaded")
+        self.graph_schema_path_label.setToolTip("")
+        self.graph_schema_path_label.setStyleSheet("color: gray; font-style: italic; font-size: 10px;")
+        
+        # Update graph view without schema
+        self.graph_view.set_schema(None)
+        self.refresh_graph_view()
+        
+        self.statusBar().showMessage("Schema cleared")
     
     def get_current_editor(self):
         """Get the currently active editor widget."""

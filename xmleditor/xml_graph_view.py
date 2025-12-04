@@ -1,6 +1,7 @@
 """
 XML graph view widget for visualizing XML structure as a node graph.
 Highlights parent-child relationships through visual nesting and connections.
+Supports schema-based key/keyref reference highlighting.
 """
 
 from PyQt6.QtWidgets import (
@@ -11,12 +12,17 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import QPen, QBrush, QColor, QFont, QPainter, QPainterPath
 from lxml import etree
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 
 # Constants for text truncation
 TEXT_PREVIEW_LENGTH = 15
 TOOLTIP_TEXT_LENGTH = 100
+
+# Color for key reference lines (red/pink for visibility)
+KEY_REFERENCE_COLOR = QColor(255, 50, 100)
+KEY_NODE_HIGHLIGHT_COLOR = QColor(255, 215, 0)  # Gold for key nodes
+KEYREF_NODE_HIGHLIGHT_COLOR = QColor(255, 100, 150)  # Pink for keyref nodes
 
 # Color palette for different nesting depths (gradient from light to dark)
 DEPTH_COLORS = [
@@ -73,11 +79,17 @@ class XMLNodeItem(QGraphicsRectItem):
         self.parent_node: Optional['XMLNodeItem'] = None
         self.depth = depth
         self.nesting_container: Optional[NestingContainer] = None
+        self.is_key = False  # Flag for key elements
+        self.is_keyref = False  # Flag for keyref elements
+        self.xpath: str = ""  # Store XPath for matching
         
         # Set up appearance based on depth
         color_index = depth % len(DEPTH_COLORS)
         node_color = DEPTH_COLORS[color_index]
         border_color = node_color.darker(130)
+        
+        self._base_color = node_color
+        self._border_color = border_color
         
         self.setRect(0, 0, 120, 60)
         self.setBrush(QBrush(node_color))
@@ -147,6 +159,24 @@ class XMLNodeItem(QGraphicsRectItem):
                 tooltip += f"\n  {k}={v}"
         self.setToolTip(tooltip)
     
+    def set_as_key(self):
+        """Mark this node as a key element."""
+        self.is_key = True
+        self.setBrush(QBrush(KEY_NODE_HIGHLIGHT_COLOR))
+        self.setPen(QPen(KEY_NODE_HIGHLIGHT_COLOR.darker(130), 3))
+        # Update tooltip
+        current_tooltip = self.toolTip()
+        self.setToolTip(current_tooltip + "\n\n🔑 KEY ELEMENT")
+    
+    def set_as_keyref(self):
+        """Mark this node as a keyref element."""
+        self.is_keyref = True
+        self.setBrush(QBrush(KEYREF_NODE_HIGHLIGHT_COLOR))
+        self.setPen(QPen(KEYREF_NODE_HIGHLIGHT_COLOR.darker(130), 3))
+        # Update tooltip
+        current_tooltip = self.toolTip()
+        self.setToolTip(current_tooltip + "\n\n🔗 KEY REFERENCE")
+    
     def get_center_bottom(self) -> QPointF:
         """Get the center bottom point of this node."""
         rect = self.sceneBoundingRect()
@@ -156,6 +186,16 @@ class XMLNodeItem(QGraphicsRectItem):
         """Get the center top point of this node."""
         rect = self.sceneBoundingRect()
         return QPointF(rect.center().x(), rect.top())
+    
+    def get_center_right(self) -> QPointF:
+        """Get the center right point of this node."""
+        rect = self.sceneBoundingRect()
+        return QPointF(rect.right(), rect.center().y())
+    
+    def get_center_left(self) -> QPointF:
+        """Get the center left point of this node."""
+        rect = self.sceneBoundingRect()
+        return QPointF(rect.left(), rect.center().y())
 
 
 class ConnectionLine(QGraphicsPathItem):
@@ -196,6 +236,56 @@ class ConnectionLine(QGraphicsPathItem):
         self.setPath(path)
 
 
+class KeyReferenceLine(QGraphicsPathItem):
+    """A dashed curved line showing key-keyref reference relationship."""
+    
+    def __init__(self, key_node: XMLNodeItem, keyref_node: XMLNodeItem, key_name: str = ""):
+        super().__init__()
+        self.key_node = key_node
+        self.keyref_node = keyref_node
+        self.key_name = key_name
+        
+        # Set up appearance - red/pink dashed line for key references
+        pen = QPen(KEY_REFERENCE_COLOR, 3, Qt.PenStyle.DashLine)
+        self.setPen(pen)
+        
+        # Set Z value above regular connections but below nodes
+        self.setZValue(0.5)
+        
+        # Set tooltip
+        self.setToolTip(f"Key Reference: {key_name}\n{keyref_node.tag} → {key_node.tag}")
+        
+        self.update_position()
+    
+    def update_position(self):
+        """Update line position based on connected nodes."""
+        # Connect from keyref to key (showing direction of reference)
+        start = self.keyref_node.get_center_right()
+        end = self.key_node.get_center_left()
+        
+        # Create a curved path that goes around other elements
+        path = QPainterPath()
+        path.moveTo(start)
+        
+        # Calculate control points for a curved path
+        mid_x = (start.x() + end.x()) / 2
+        offset_y = 50  # Offset to make the curve more visible
+        
+        # Curve upward if keyref is below key, downward otherwise
+        if start.y() > end.y():
+            control_y = min(start.y(), end.y()) - offset_y
+        else:
+            control_y = max(start.y(), end.y()) + offset_y
+        
+        path.cubicTo(
+            start.x() + 30, control_y,
+            end.x() - 30, control_y,
+            end.x(), end.y()
+        )
+        
+        self.setPath(path)
+
+
 class XMLGraphScene(QGraphicsScene):
     """Scene for displaying XML as a node graph with nesting visualization."""
     
@@ -203,35 +293,41 @@ class XMLGraphScene(QGraphicsScene):
         super().__init__(parent)
         self.nodes: List[XMLNodeItem] = []
         self.connections: List[ConnectionLine] = []
+        self.key_references: List[KeyReferenceLine] = []
         self.nesting_containers: List[NestingContainer] = []
         self.node_width = 120
         self.node_height = 60
         self.horizontal_spacing = 40
         self.vertical_spacing = 80
         self.nesting_padding = 15  # Padding for nesting containers
+        self.schema_content: Optional[str] = None  # Store schema for key analysis
     
     def clear_graph(self):
         """Clear all nodes and connections from the scene."""
         self.clear()
         self.nodes = []
         self.connections = []
+        self.key_references = []
         self.nesting_containers = []
     
-    def load_xml(self, xml_content: str, show_namespaces: bool = False):
+    def load_xml(self, xml_content: str, show_namespaces: bool = False, 
+                 schema_content: Optional[str] = None):
         """
         Load XML content and create the node graph with nesting visualization.
         
         Args:
             xml_content: XML string to visualize
             show_namespaces: Whether to show namespace prefixes
+            schema_content: Optional XSD schema content for key/keyref analysis
         """
         self.clear_graph()
+        self.schema_content = schema_content
         
         try:
             tree = etree.fromstring(xml_content.encode('utf-8'))
             
             # Build the graph
-            root_node = self._create_node_recursive(tree, show_namespaces, 0)
+            root_node = self._create_node_recursive(tree, show_namespaces, 0, tree)
             
             # Calculate layout
             self._layout_tree(root_node, 0, 0)
@@ -242,6 +338,10 @@ class XMLGraphScene(QGraphicsScene):
             # Create nesting containers to highlight parent-child relationships
             self._create_nesting_containers(root_node)
             
+            # If schema provided, parse and highlight key references
+            if schema_content:
+                self._apply_key_references(tree, schema_content)
+            
             # Adjust scene rect to fit all items
             self.setSceneRect(self.itemsBoundingRect().adjusted(-50, -50, 50, 50))
             
@@ -249,6 +349,144 @@ class XMLGraphScene(QGraphicsScene):
             # Show error message in scene
             error_text = self.addText(f"Error: {str(e)}")
             error_text.setDefaultTextColor(QColor(255, 0, 0))
+    
+    def _apply_key_references(self, xml_tree: etree._Element, schema_content: str):
+        """Parse schema and apply key/keyref highlighting to nodes."""
+        try:
+            schema_tree = etree.fromstring(schema_content.encode('utf-8'))
+            
+            # XSD namespace
+            xs_ns = '{http://www.w3.org/2001/XMLSchema}'
+            
+            # Find all key and keyref definitions
+            keys = {}  # name -> {selector_xpath, field_xpath}
+            keyrefs = []  # list of {name, refer, selector_xpath, field_xpath}
+            
+            for key_elem in schema_tree.iter(f'{xs_ns}key'):
+                key_name = key_elem.get('name')
+                selector = key_elem.find(f'{xs_ns}selector')
+                field = key_elem.find(f'{xs_ns}field')
+                if key_name and selector is not None and field is not None:
+                    keys[key_name] = {
+                        'selector': selector.get('xpath', ''),
+                        'field': field.get('xpath', '')
+                    }
+            
+            for keyref_elem in schema_tree.iter(f'{xs_ns}keyref'):
+                keyref_name = keyref_elem.get('name')
+                refer = keyref_elem.get('refer')
+                selector = keyref_elem.find(f'{xs_ns}selector')
+                field = keyref_elem.find(f'{xs_ns}field')
+                if keyref_name and refer and selector is not None and field is not None:
+                    keyrefs.append({
+                        'name': keyref_name,
+                        'refer': refer,
+                        'selector': selector.get('xpath', ''),
+                        'field': field.get('xpath', '')
+                    })
+            
+            # Build a mapping from XPath to graph nodes
+            node_map = self._build_node_map()
+            
+            # Apply key highlighting
+            for key_name, key_info in keys.items():
+                selector_xpath = key_info['selector']
+                field_xpath = key_info['field']
+                
+                # Find elements matching the selector
+                try:
+                    key_elements = xml_tree.xpath(selector_xpath)
+                    for elem in key_elements:
+                        # Find the field value
+                        field_values = elem.xpath(field_xpath)
+                        
+                        # Find corresponding graph node and mark as key
+                        elem_path = xml_tree.getroottree().getpath(elem)
+                        if elem_path in node_map:
+                            node_map[elem_path].set_as_key()
+                            
+                        # Also mark the field element if it's a child element
+                        if field_xpath.startswith('@'):
+                            # It's an attribute, the key is on the element itself
+                            pass
+                        else:
+                            # It's a child element
+                            for field_elem in elem.xpath(field_xpath):
+                                if hasattr(field_elem, 'getroottree'):
+                                    field_path = xml_tree.getroottree().getpath(field_elem)
+                                    if field_path in node_map:
+                                        node_map[field_path].set_as_key()
+                except Exception:
+                    pass  # Skip if XPath fails
+            
+            # Apply keyref highlighting and create reference lines
+            for keyref_info in keyrefs:
+                ref_name = keyref_info['refer']
+                if ref_name not in keys:
+                    continue
+                    
+                key_info = keys[ref_name]
+                selector_xpath = keyref_info['selector']
+                field_xpath = keyref_info['field']
+                
+                try:
+                    # Find keyref elements
+                    keyref_elements = xml_tree.xpath(selector_xpath)
+                    
+                    for keyref_elem in keyref_elements:
+                        # Get the field value (the reference value)
+                        field_values = keyref_elem.xpath(field_xpath)
+                        
+                        keyref_elem_path = xml_tree.getroottree().getpath(keyref_elem)
+                        
+                        # Mark the keyref element
+                        if keyref_elem_path in node_map:
+                            node_map[keyref_elem_path].set_as_keyref()
+                        
+                        # Also mark the field element
+                        for field_elem in keyref_elem.xpath(field_xpath):
+                            if hasattr(field_elem, 'getroottree'):
+                                field_path = xml_tree.getroottree().getpath(field_elem)
+                                if field_path in node_map:
+                                    keyref_node = node_map[field_path]
+                                    keyref_node.set_as_keyref()
+                                    
+                                    # Get the reference value
+                                    ref_value = field_elem.text if hasattr(field_elem, 'text') else str(field_elem)
+                                    
+                                    # Find the matching key element
+                                    key_selector = key_info['selector']
+                                    key_field = key_info['field']
+                                    
+                                    for key_elem in xml_tree.xpath(key_selector):
+                                        key_values = key_elem.xpath(key_field)
+                                        for kv in key_values:
+                                            kv_text = kv if isinstance(kv, str) else (kv.text if hasattr(kv, 'text') else str(kv))
+                                            if kv_text == ref_value:
+                                                key_elem_path = xml_tree.getroottree().getpath(key_elem)
+                                                if key_elem_path in node_map:
+                                                    key_node = node_map[key_elem_path]
+                                                    # Create reference line
+                                                    ref_line = KeyReferenceLine(
+                                                        key_node, keyref_node, 
+                                                        keyref_info['name']
+                                                    )
+                                                    self.addItem(ref_line)
+                                                    self.key_references.append(ref_line)
+                except Exception:
+                    pass  # Skip if XPath fails
+                    
+        except Exception as e:
+            # Silently fail - schema parsing errors shouldn't break the graph
+            pass
+    
+    def _build_node_map(self) -> Dict[str, XMLNodeItem]:
+        """Build a mapping from XPath to graph nodes."""
+        node_map = {}
+        for node in self.nodes:
+            if node.xpath:
+                node_map[node.xpath] = node
+        return node_map
     
     def _extract_tag_name(self, element: etree._Element, show_namespaces: bool) -> str:
         """Extract the tag name from an element, handling namespaces."""
@@ -268,19 +506,29 @@ class XMLGraphScene(QGraphicsScene):
         return tag
     
     def _create_node_recursive(self, element: etree._Element, 
-                                show_namespaces: bool, depth: int) -> XMLNodeItem:
+                                show_namespaces: bool, depth: int,
+                                root_tree: etree._Element = None) -> XMLNodeItem:
         """Recursively create nodes for the XML tree."""
         tag = self._extract_tag_name(element, show_namespaces)
         text = element.text.strip() if element.text and element.text.strip() else ""
         attributes = dict(element.attrib)
         
         node = XMLNodeItem(tag, text, attributes, depth)
+        
+        # Store XPath for this node
+        if root_tree is None:
+            root_tree = element
+        try:
+            node.xpath = root_tree.getroottree().getpath(element)
+        except Exception:
+            node.xpath = ""
+        
         self.addItem(node)
         self.nodes.append(node)
         
         # Process children
         for child_element in element:
-            child_node = self._create_node_recursive(child_element, show_namespaces, depth + 1)
+            child_node = self._create_node_recursive(child_element, show_namespaces, depth + 1, root_tree)
             child_node.parent_node = node
             node.child_nodes.append(child_node)
         
@@ -371,6 +619,7 @@ class XMLGraphView(QGraphicsView):
         super().__init__(parent)
         self.graph_scene = XMLGraphScene()
         self.setScene(self.graph_scene)
+        self.schema_content: Optional[str] = None  # Store schema for key highlighting
         
         # Set up view properties
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -389,9 +638,13 @@ class XMLGraphView(QGraphicsView):
         # Minimum size
         self.setMinimumSize(300, 200)
     
+    def set_schema(self, schema_content: Optional[str]):
+        """Set the XSD schema content for key/keyref highlighting."""
+        self.schema_content = schema_content
+    
     def load_xml(self, xml_content: str, show_namespaces: bool = False):
         """Load XML content and display as a graph."""
-        self.graph_scene.load_xml(xml_content, show_namespaces)
+        self.graph_scene.load_xml(xml_content, show_namespaces, self.schema_content)
         self.fitInView(self.graph_scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
     
     def clear(self):
