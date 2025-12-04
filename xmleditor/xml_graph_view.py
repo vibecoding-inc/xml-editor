@@ -19,6 +19,10 @@ from typing import List, Dict, Any, Optional, Tuple
 TEXT_PREVIEW_LENGTH = 15
 TOOLTIP_TEXT_LENGTH = 100
 
+# Constants for key reference line layout
+KEY_REF_CURVE_OFFSET = 50  # Vertical offset for reference line curves
+KEY_REF_CURVE_CONTROL = 30  # Horizontal offset for curve control points
+
 # Color for key reference lines (red/pink for visibility)
 KEY_REFERENCE_COLOR = QColor(255, 50, 100)
 KEY_NODE_HIGHLIGHT_COLOR = QColor(255, 215, 0)  # Gold for key nodes
@@ -268,18 +272,15 @@ class KeyReferenceLine(QGraphicsPathItem):
         path.moveTo(start)
         
         # Calculate control points for a curved path
-        mid_x = (start.x() + end.x()) / 2
-        offset_y = 50  # Offset to make the curve more visible
-        
         # Curve upward if keyref is below key, downward otherwise
         if start.y() > end.y():
-            control_y = min(start.y(), end.y()) - offset_y
+            control_y = min(start.y(), end.y()) - KEY_REF_CURVE_OFFSET
         else:
-            control_y = max(start.y(), end.y()) + offset_y
+            control_y = max(start.y(), end.y()) + KEY_REF_CURVE_OFFSET
         
         path.cubicTo(
-            start.x() + 30, control_y,
-            end.x() - 30, control_y,
+            start.x() + KEY_REF_CURVE_CONTROL, control_y,
+            end.x() - KEY_REF_CURVE_CONTROL, control_y,
             end.x(), end.y()
         )
         
@@ -416,8 +417,10 @@ class XMLGraphScene(QGraphicsScene):
                                     field_path = xml_tree.getroottree().getpath(field_elem)
                                     if field_path in node_map:
                                         node_map[field_path].set_as_key()
+                except etree.XPathEvalError:
+                    pass  # Skip if XPath evaluation fails
                 except Exception:
-                    pass  # Skip if XPath fails
+                    pass  # Skip other errors
             
             # Apply keyref highlighting and create reference lines
             for keyref_info in keyrefs:
@@ -451,8 +454,8 @@ class XMLGraphScene(QGraphicsScene):
                                     keyref_node = node_map[field_path]
                                     keyref_node.set_as_keyref()
                                     
-                                    # Get the reference value
-                                    ref_value = field_elem.text if hasattr(field_elem, 'text') else str(field_elem)
+                                    # Get the reference value (handle None text)
+                                    ref_value = field_elem.text if field_elem.text is not None else ""
                                     
                                     # Find the matching key element
                                     key_selector = key_info['selector']
@@ -461,8 +464,15 @@ class XMLGraphScene(QGraphicsScene):
                                     for key_elem in xml_tree.xpath(key_selector):
                                         key_values = key_elem.xpath(key_field)
                                         for kv in key_values:
-                                            kv_text = kv if isinstance(kv, str) else (kv.text if hasattr(kv, 'text') else str(kv))
-                                            if kv_text == ref_value:
+                                            # Handle both string results and element results
+                                            if isinstance(kv, str):
+                                                kv_text = kv
+                                            elif hasattr(kv, 'text') and kv.text is not None:
+                                                kv_text = kv.text
+                                            else:
+                                                kv_text = str(kv) if kv is not None else ""
+                                            
+                                            if kv_text == ref_value and ref_value:
                                                 key_elem_path = xml_tree.getroottree().getpath(key_elem)
                                                 if key_elem_path in node_map:
                                                     key_node = node_map[key_elem_path]
@@ -473,12 +483,15 @@ class XMLGraphScene(QGraphicsScene):
                                                     )
                                                     self.addItem(ref_line)
                                                     self.key_references.append(ref_line)
+                except etree.XPathEvalError:
+                    pass  # Skip if XPath evaluation fails
                 except Exception:
-                    pass  # Skip if XPath fails
+                    pass  # Skip other XPath-related errors
                     
-        except Exception as e:
-            # Silently fail - schema parsing errors shouldn't break the graph
-            pass
+        except etree.XMLSyntaxError:
+            pass  # Schema parsing error - don't break the graph
+        except Exception:
+            pass  # Other schema errors - silently continue
     
     def _build_node_map(self) -> Dict[str, XMLNodeItem]:
         """Build a mapping from XPath to graph nodes."""
