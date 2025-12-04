@@ -498,49 +498,85 @@ class MainWindow(QMainWindow):
         # Create container widget with layout
         graph_widget = QWidget()
         graph_layout = QVBoxLayout(graph_widget)
+        graph_layout.setContentsMargins(5, 2, 5, 2)
+        graph_layout.setSpacing(2)
         
-        # Add description label
-        info_label = QLabel("Visual node graph of XML structure. Use mouse wheel to zoom, drag to pan.")
-        info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: gray; font-size: 10px; padding: 5px;")
-        graph_layout.addWidget(info_label)
+        # Single compact toolbar row with all controls
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setSpacing(5)
         
-        # Add control buttons row
-        button_layout = QHBoxLayout()
-        
-        refresh_btn = QPushButton("Refresh")
+        # Refresh and Fit buttons
+        refresh_btn = QPushButton("⟳")
+        refresh_btn.setToolTip("Refresh graph")
+        refresh_btn.setMaximumWidth(30)
         refresh_btn.clicked.connect(self.refresh_graph_view)
-        button_layout.addWidget(refresh_btn)
+        toolbar_layout.addWidget(refresh_btn)
         
-        fit_btn = QPushButton("Fit to View")
+        fit_btn = QPushButton("⊡")
+        fit_btn.setToolTip("Fit to view")
+        fit_btn.setMaximumWidth(30)
         fit_btn.clicked.connect(self.fit_graph_to_view)
-        button_layout.addWidget(fit_btn)
+        toolbar_layout.addWidget(fit_btn)
         
-        button_layout.addStretch()
-        graph_layout.addLayout(button_layout)
+        toolbar_layout.addWidget(self._create_separator())
         
-        # Add schema file picker row for key/keyref highlighting
-        schema_layout = QHBoxLayout()
+        # Layout algorithm selector
+        from PyQt6.QtWidgets import QComboBox
+        layout_label = QLabel("Layout:")
+        layout_label.setStyleSheet("font-size: 10px;")
+        toolbar_layout.addWidget(layout_label)
         
-        schema_label = QLabel("Schema (for key refs):")
-        schema_label.setStyleSheet("font-size: 10px;")
-        schema_layout.addWidget(schema_label)
+        self.graph_layout_combo = QComboBox()
+        self.graph_layout_combo.addItems(["Tree (Top-Down)", "Tree (Left-Right)", "Radial", "Compact"])
+        self.graph_layout_combo.setMaximumWidth(120)
+        self.graph_layout_combo.setToolTip("Select layout algorithm")
+        self.graph_layout_combo.currentIndexChanged.connect(self.on_graph_layout_changed)
+        toolbar_layout.addWidget(self.graph_layout_combo)
         
-        self.graph_schema_path_label = QLabel("No schema loaded")
-        self.graph_schema_path_label.setStyleSheet("color: gray; font-style: italic; font-size: 10px;")
-        schema_layout.addWidget(self.graph_schema_path_label, 1)
+        toolbar_layout.addWidget(self._create_separator())
         
-        load_schema_btn = QPushButton("Load Schema...")
-        load_schema_btn.setMaximumWidth(100)
+        # Display checkboxes
+        from PyQt6.QtWidgets import QCheckBox
+        self.show_connections_cb = QCheckBox("Lines")
+        self.show_connections_cb.setChecked(True)
+        self.show_connections_cb.setToolTip("Show connection lines")
+        self.show_connections_cb.stateChanged.connect(self.on_graph_display_changed)
+        toolbar_layout.addWidget(self.show_connections_cb)
+        
+        self.show_nesting_cb = QCheckBox("Nesting")
+        self.show_nesting_cb.setChecked(True)
+        self.show_nesting_cb.setToolTip("Show nesting containers")
+        self.show_nesting_cb.stateChanged.connect(self.on_graph_display_changed)
+        toolbar_layout.addWidget(self.show_nesting_cb)
+        
+        self.show_keyrefs_cb = QCheckBox("Key Refs")
+        self.show_keyrefs_cb.setChecked(True)
+        self.show_keyrefs_cb.setToolTip("Show key reference lines")
+        self.show_keyrefs_cb.stateChanged.connect(self.on_graph_display_changed)
+        toolbar_layout.addWidget(self.show_keyrefs_cb)
+        
+        toolbar_layout.addWidget(self._create_separator())
+        
+        # Schema controls
+        self.graph_schema_path_label = QLabel("No schema")
+        self.graph_schema_path_label.setStyleSheet("color: gray; font-size: 9px;")
+        self.graph_schema_path_label.setMaximumWidth(80)
+        toolbar_layout.addWidget(self.graph_schema_path_label)
+        
+        load_schema_btn = QPushButton("📂")
+        load_schema_btn.setToolTip("Load XSD schema for key references")
+        load_schema_btn.setMaximumWidth(30)
         load_schema_btn.clicked.connect(self.load_graph_schema)
-        schema_layout.addWidget(load_schema_btn)
+        toolbar_layout.addWidget(load_schema_btn)
         
-        clear_schema_btn = QPushButton("Clear")
-        clear_schema_btn.setMaximumWidth(60)
+        clear_schema_btn = QPushButton("✕")
+        clear_schema_btn.setToolTip("Clear schema")
+        clear_schema_btn.setMaximumWidth(25)
         clear_schema_btn.clicked.connect(self.clear_graph_schema)
-        schema_layout.addWidget(clear_schema_btn)
+        toolbar_layout.addWidget(clear_schema_btn)
         
-        graph_layout.addLayout(schema_layout)
+        toolbar_layout.addStretch()
+        graph_layout.addLayout(toolbar_layout)
         
         # Store schema file path and content
         self.graph_schema_file_path = None
@@ -553,6 +589,29 @@ class MainWindow(QMainWindow):
         self.graph_dock.setWidget(graph_widget)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.graph_dock)
         self.graph_dock.hide()
+    
+    def _create_separator(self):
+        """Create a vertical separator line."""
+        from PyQt6.QtWidgets import QFrame
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        return separator
+    
+    def on_graph_layout_changed(self, index):
+        """Handle layout algorithm change."""
+        layout_names = ["tree_vertical", "tree_horizontal", "radial", "compact"]
+        if index < len(layout_names):
+            self.graph_view.set_layout_algorithm(layout_names[index])
+            self.refresh_graph_view()
+    
+    def on_graph_display_changed(self):
+        """Handle display option checkbox changes."""
+        self.graph_view.set_display_options(
+            show_connections=self.show_connections_cb.isChecked(),
+            show_nesting=self.show_nesting_cb.isChecked(),
+            show_keyrefs=self.show_keyrefs_cb.isChecked()
+        )
     
     def load_graph_schema(self):
         """Load XSD schema for key/keyref highlighting in graph view."""
@@ -567,15 +626,18 @@ class MainWindow(QMainWindow):
                     self.graph_schema_content = f.read()
                 
                 self.graph_schema_file_path = file_path
-                self.graph_schema_path_label.setText(os.path.basename(file_path))
+                basename = os.path.basename(file_path)
+                # Truncate for compact display
+                display_name = basename[:10] + "..." if len(basename) > 13 else basename
+                self.graph_schema_path_label.setText(display_name)
                 self.graph_schema_path_label.setToolTip(file_path)
-                self.graph_schema_path_label.setStyleSheet("color: green; font-style: normal; font-size: 10px;")
+                self.graph_schema_path_label.setStyleSheet("color: green; font-size: 9px;")
                 
                 # Update graph view with schema
                 self.graph_view.set_schema(self.graph_schema_content)
                 self.refresh_graph_view()
                 
-                self.statusBar().showMessage(f"Schema loaded: {os.path.basename(file_path)}")
+                self.statusBar().showMessage(f"Schema loaded: {basename}")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load schema:\n{str(e)}")
     
@@ -583,9 +645,9 @@ class MainWindow(QMainWindow):
         """Clear the loaded graph schema."""
         self.graph_schema_file_path = None
         self.graph_schema_content = None
-        self.graph_schema_path_label.setText("No schema loaded")
+        self.graph_schema_path_label.setText("No schema")
         self.graph_schema_path_label.setToolTip("")
-        self.graph_schema_path_label.setStyleSheet("color: gray; font-style: italic; font-size: 10px;")
+        self.graph_schema_path_label.setStyleSheet("color: gray; font-size: 9px;")
         
         # Update graph view without schema
         self.graph_view.set_schema(None)

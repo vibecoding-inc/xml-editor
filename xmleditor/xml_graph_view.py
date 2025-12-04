@@ -302,6 +302,11 @@ class XMLGraphScene(QGraphicsScene):
         self.vertical_spacing = 80
         self.nesting_padding = 15  # Padding for nesting containers
         self.schema_content: Optional[str] = None  # Store schema for key analysis
+        self.layout_algorithm: str = "tree_vertical"  # Default layout
+    
+    def set_layout_algorithm(self, algorithm: str):
+        """Set the layout algorithm to use."""
+        self.layout_algorithm = algorithm
     
     def clear_graph(self):
         """Clear all nodes and connections from the scene."""
@@ -330,8 +335,15 @@ class XMLGraphScene(QGraphicsScene):
             # Build the graph
             root_node = self._create_node_recursive(tree, show_namespaces, 0, tree)
             
-            # Calculate layout
-            self._layout_tree(root_node, 0, 0)
+            # Calculate layout based on selected algorithm
+            if self.layout_algorithm == "tree_horizontal":
+                self._layout_tree_horizontal(root_node, 0, 0)
+            elif self.layout_algorithm == "radial":
+                self._layout_radial(root_node)
+            elif self.layout_algorithm == "compact":
+                self._layout_compact(root_node, 0, 0)
+            else:  # Default: tree_vertical
+                self._layout_tree(root_node, 0, 0)
             
             # Create connection lines
             self._create_connections(root_node)
@@ -555,7 +567,7 @@ class XMLGraphScene(QGraphicsScene):
     
     def _layout_tree(self, node: XMLNodeItem, depth: int, offset: int) -> int:
         """
-        Layout the tree using a simple recursive algorithm.
+        Layout the tree using a simple recursive algorithm (top-down).
         Returns the width taken by this subtree.
         """
         if not node.child_nodes:
@@ -575,6 +587,120 @@ class XMLGraphScene(QGraphicsScene):
         center_x = (first_child_x + last_child_x) / 2
         
         _, y = self._calculate_position(0, depth)
+        node.setPos(center_x, y)
+        
+        return child_width
+    
+    def _layout_tree_horizontal(self, node: XMLNodeItem, depth: int, offset: int) -> int:
+        """
+        Layout the tree horizontally (left-to-right).
+        Returns the height taken by this subtree.
+        """
+        if not node.child_nodes:
+            # Leaf node - swap x and y
+            x = depth * (self.node_width + self.horizontal_spacing)
+            y = offset * (self.node_height + self.vertical_spacing // 2)
+            node.setPos(x, y)
+            return 1
+        
+        # Calculate positions for children
+        child_height = 0
+        for child in node.child_nodes:
+            child_height += self._layout_tree_horizontal(child, depth + 1, offset + child_height)
+        
+        # Position this node centered to the left of its children
+        first_child_y = node.child_nodes[0].pos().y()
+        last_child_y = node.child_nodes[-1].pos().y()
+        center_y = (first_child_y + last_child_y) / 2
+        
+        x = depth * (self.node_width + self.horizontal_spacing)
+        node.setPos(x, center_y)
+        
+        return child_height
+    
+    def _layout_radial(self, root_node: XMLNodeItem):
+        """
+        Layout the tree in a radial/circular pattern.
+        """
+        import math
+        
+        # Calculate total nodes at each level for angle distribution
+        def count_leaves(node: XMLNodeItem) -> int:
+            if not node.child_nodes:
+                return 1
+            return sum(count_leaves(c) for c in node.child_nodes)
+        
+        total_leaves = count_leaves(root_node)
+        if total_leaves == 0:
+            total_leaves = 1
+        
+        # Center position
+        center_x = 400
+        center_y = 400
+        radius_step = 150
+        
+        # Position root at center
+        root_node.setPos(center_x - self.node_width / 2, center_y - self.node_height / 2)
+        
+        def layout_radial_recursive(node: XMLNodeItem, start_angle: float, 
+                                    end_angle: float, depth: int):
+            if not node.child_nodes:
+                return
+            
+            radius = depth * radius_step
+            total_child_leaves = sum(count_leaves(c) for c in node.child_nodes)
+            if total_child_leaves == 0:
+                total_child_leaves = len(node.child_nodes)
+            
+            angle_range = end_angle - start_angle
+            current_angle = start_angle
+            
+            for child in node.child_nodes:
+                child_leaves = count_leaves(child)
+                child_angle_span = (child_leaves / total_child_leaves) * angle_range
+                child_angle = current_angle + child_angle_span / 2
+                
+                # Calculate position
+                x = center_x + radius * math.cos(child_angle) - self.node_width / 2
+                y = center_y + radius * math.sin(child_angle) - self.node_height / 2
+                child.setPos(x, y)
+                
+                # Recurse for children
+                layout_radial_recursive(child, current_angle, 
+                                       current_angle + child_angle_span, depth + 1)
+                
+                current_angle += child_angle_span
+        
+        # Start layout from root
+        layout_radial_recursive(root_node, 0, 2 * math.pi, 1)
+    
+    def _layout_compact(self, node: XMLNodeItem, depth: int, offset: int) -> int:
+        """
+        Layout the tree in a more compact form with reduced spacing.
+        Returns the width taken by this subtree.
+        """
+        # Use reduced spacing for compact layout
+        compact_h_spacing = 20
+        compact_v_spacing = 50
+        
+        if not node.child_nodes:
+            # Leaf node
+            x = offset * (self.node_width + compact_h_spacing)
+            y = depth * (self.node_height + compact_v_spacing)
+            node.setPos(x, y)
+            return 1
+        
+        # Calculate positions for children
+        child_width = 0
+        for child in node.child_nodes:
+            child_width += self._layout_compact(child, depth + 1, offset + child_width)
+        
+        # Position this node centered above its children
+        first_child_x = node.child_nodes[0].pos().x()
+        last_child_x = node.child_nodes[-1].pos().x()
+        center_x = (first_child_x + last_child_x) / 2
+        
+        y = depth * (self.node_height + compact_v_spacing)
         node.setPos(center_x, y)
         
         return child_width
@@ -633,6 +759,12 @@ class XMLGraphView(QGraphicsView):
         self.graph_scene = XMLGraphScene()
         self.setScene(self.graph_scene)
         self.schema_content: Optional[str] = None  # Store schema for key highlighting
+        self.layout_algorithm: str = "tree_vertical"  # Current layout algorithm
+        
+        # Display options
+        self.show_connections = True
+        self.show_nesting = True
+        self.show_keyrefs = True
         
         # Set up view properties
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -649,15 +781,37 @@ class XMLGraphView(QGraphicsView):
         self.setBackgroundBrush(QBrush(QColor(245, 245, 250)))
         
         # Minimum size
-        self.setMinimumSize(300, 200)
+        self.setMinimumSize(300, 150)
     
     def set_schema(self, schema_content: Optional[str]):
         """Set the XSD schema content for key/keyref highlighting."""
         self.schema_content = schema_content
     
+    def set_layout_algorithm(self, algorithm: str):
+        """Set the layout algorithm to use."""
+        self.layout_algorithm = algorithm
+        self.graph_scene.set_layout_algorithm(algorithm)
+    
+    def set_display_options(self, show_connections: bool = True, 
+                           show_nesting: bool = True, show_keyrefs: bool = True):
+        """Set display options for graph elements."""
+        self.show_connections = show_connections
+        self.show_nesting = show_nesting
+        self.show_keyrefs = show_keyrefs
+        
+        # Update visibility of elements
+        for conn in self.graph_scene.connections:
+            conn.setVisible(show_connections)
+        for container in self.graph_scene.nesting_containers:
+            container.setVisible(show_nesting)
+        for keyref in self.graph_scene.key_references:
+            keyref.setVisible(show_keyrefs)
+    
     def load_xml(self, xml_content: str, show_namespaces: bool = False):
         """Load XML content and display as a graph."""
         self.graph_scene.load_xml(xml_content, show_namespaces, self.schema_content)
+        # Apply current display options
+        self.set_display_options(self.show_connections, self.show_nesting, self.show_keyrefs)
         self.fitInView(self.graph_scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
     
     def clear(self):
