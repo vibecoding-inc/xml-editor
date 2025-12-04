@@ -14,6 +14,10 @@ from lxml import etree
 from typing import List, Dict, Any, Optional
 
 
+# Constants for text truncation
+TEXT_PREVIEW_LENGTH = 15
+TOOLTIP_TEXT_LENGTH = 100
+
 # Color palette for different nesting depths (gradient from light to dark)
 DEPTH_COLORS = [
     QColor(70, 130, 180),    # Steel blue (root)
@@ -101,7 +105,7 @@ class XMLNodeItem(QGraphicsRectItem):
         
         # Add text content preview if available
         if text:
-            preview = text[:15] + "..." if len(text) > 15 else text
+            preview = text[:TEXT_PREVIEW_LENGTH] + "..." if len(text) > TEXT_PREVIEW_LENGTH else text
             self.content_text = QGraphicsTextItem(preview, self)
             self.content_text.setDefaultTextColor(QColor(220, 220, 220))
             content_font = QFont("Arial", 8)
@@ -136,7 +140,7 @@ class XMLNodeItem(QGraphicsRectItem):
         # Store tooltip with full information
         tooltip = f"Tag: {tag}\nDepth: {depth}"
         if text:
-            tooltip += f"\nText: {text[:100]}{'...' if len(text) > 100 else ''}"
+            tooltip += f"\nText: {text[:TOOLTIP_TEXT_LENGTH]}{'...' if len(text) > TOOLTIP_TEXT_LENGTH else ''}"
         if attributes:
             tooltip += "\nAttributes:"
             for k, v in attributes.items():
@@ -249,16 +253,18 @@ class XMLGraphScene(QGraphicsScene):
     def _extract_tag_name(self, element: etree._Element, show_namespaces: bool) -> str:
         """Extract the tag name from an element, handling namespaces."""
         tag = element.tag
-        if isinstance(tag, str) and tag.startswith('{'):
-            ns_uri, local_name = tag[1:].split('}', 1)
-            if show_namespaces:
-                prefix = None
-                for p, uri in element.nsmap.items():
-                    if uri == ns_uri:
-                        prefix = p
-                        break
-                return f"{prefix}:{local_name}" if prefix else local_name
-            return local_name
+        if isinstance(tag, str) and tag.startswith('{') and '}' in tag:
+            parts = tag[1:].split('}', 1)
+            if len(parts) == 2:
+                ns_uri, local_name = parts
+                if show_namespaces:
+                    prefix = None
+                    for p, uri in element.nsmap.items():
+                        if uri == ns_uri:
+                            prefix = p
+                            break
+                    return f"{prefix}:{local_name}" if prefix else local_name
+                return local_name
         return tag
     
     def _create_node_recursive(self, element: etree._Element, 
@@ -280,6 +286,12 @@ class XMLGraphScene(QGraphicsScene):
         
         return node
     
+    def _calculate_position(self, offset: int, depth: int) -> tuple:
+        """Calculate x, y position based on offset and depth."""
+        x = offset * (self.node_width + self.horizontal_spacing)
+        y = depth * (self.node_height + self.vertical_spacing)
+        return x, y
+    
     def _layout_tree(self, node: XMLNodeItem, depth: int, offset: int) -> int:
         """
         Layout the tree using a simple recursive algorithm.
@@ -287,8 +299,7 @@ class XMLGraphScene(QGraphicsScene):
         """
         if not node.child_nodes:
             # Leaf node
-            x = offset * (self.node_width + self.horizontal_spacing)
-            y = depth * (self.node_height + self.vertical_spacing)
+            x, y = self._calculate_position(offset, depth)
             node.setPos(x, y)
             return 1
         
@@ -302,7 +313,7 @@ class XMLGraphScene(QGraphicsScene):
         last_child_x = node.child_nodes[-1].pos().x()
         center_x = (first_child_x + last_child_x) / 2
         
-        y = depth * (self.node_height + self.vertical_spacing)
+        _, y = self._calculate_position(0, depth)
         node.setPos(center_x, y)
         
         return child_width
