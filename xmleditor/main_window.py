@@ -6,7 +6,8 @@ import os
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                               QSplitter, QMenuBar, QMenu, QToolBar, QFileDialog, 
                               QMessageBox, QInputDialog, QDockWidget, QTextEdit,
-                              QLabel, QStatusBar, QTabWidget, QPushButton, QTabBar)
+                              QLabel, QStatusBar, QTabWidget, QPushButton, QTabBar,
+                              QComboBox, QCheckBox, QFrame)
 from PyQt6.QtGui import QAction, QKeySequence, QIcon, QActionGroup
 from PyQt6.QtCore import Qt, QSettings, QTimer
 from PyQt6.Qsci import QsciScintilla
@@ -521,7 +522,6 @@ class MainWindow(QMainWindow):
         toolbar_layout.addWidget(self._create_separator())
         
         # Layout algorithm selector
-        from PyQt6.QtWidgets import QComboBox
         layout_label = QLabel("Layout:")
         layout_label.setStyleSheet("font-size: 10px;")
         toolbar_layout.addWidget(layout_label)
@@ -536,7 +536,6 @@ class MainWindow(QMainWindow):
         toolbar_layout.addWidget(self._create_separator())
         
         # Display checkboxes
-        from PyQt6.QtWidgets import QCheckBox
         self.show_connections_cb = QCheckBox("Lines")
         self.show_connections_cb.setChecked(True)
         self.show_connections_cb.setToolTip("Show connection lines")
@@ -592,7 +591,6 @@ class MainWindow(QMainWindow):
     
     def _create_separator(self):
         """Create a vertical separator line."""
-        from PyQt6.QtWidgets import QFrame
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.VLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)

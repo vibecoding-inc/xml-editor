@@ -4,6 +4,7 @@ Highlights parent-child relationships through visual nesting and connections.
 Supports schema-based key/keyref reference highlighting.
 """
 
+import math
 from PyQt6.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsItem, 
     QGraphicsRectItem, QGraphicsTextItem, QGraphicsLineItem,
@@ -622,8 +623,6 @@ class XMLGraphScene(QGraphicsScene):
         """
         Layout the tree in a radial/circular pattern.
         """
-        import math
-        
         # Calculate total nodes at each level for angle distribution
         def count_leaves(node: XMLNodeItem) -> int:
             if not node.child_nodes:
