@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QSettings, QTimer
 from PyQt6.Qsci import QsciScintilla
 from xmleditor.xml_editor import XMLEditor
 from xmleditor.xml_tree_view import XMLTreeView
+from xmleditor.xml_graph_view import XMLGraphView
 from xmleditor.xpath_dialog import XPathDialog
 from xmleditor.validation_dialog import ValidationDialog
 from xmleditor.xslt_dialog import XSLTDialog
@@ -94,6 +95,9 @@ class MainWindow(QMainWindow):
         
         # Create validation panel as dock widget
         self.create_validation_panel()
+        
+        # Create graph view panel as dock widget
+        self.create_graph_panel()
         
         # Create menu bar
         self.create_menu_bar()
@@ -274,6 +278,12 @@ class MainWindow(QMainWindow):
         toggle_validation_action.triggered.connect(self.toggle_validation_panel)
         view_menu.addAction(toggle_validation_action)
         
+        toggle_graph_action = QAction("Toggle &Graph View", self)
+        toggle_graph_action.setShortcut(QKeySequence("Ctrl+G"))
+        toggle_graph_action.setStatusTip("Toggle XML node graph visualization")
+        toggle_graph_action.triggered.connect(self.toggle_graph_panel)
+        view_menu.addAction(toggle_graph_action)
+        
         view_menu.addSeparator()
         
         word_wrap_action = QAction("Word &Wrap", self)
@@ -358,6 +368,13 @@ class MainWindow(QMainWindow):
         xpath_action = QAction("XPath", self)
         xpath_action.triggered.connect(self.show_xpath_dialog)
         toolbar.addAction(xpath_action)
+        
+        toolbar.addSeparator()
+        
+        graph_action = QAction("Graph", self)
+        graph_action.setStatusTip("Toggle XML node graph visualization")
+        graph_action.triggered.connect(self.toggle_graph_panel)
+        toolbar.addAction(graph_action)
         
     def create_status_bar(self):
         """Create status bar."""
@@ -473,6 +490,43 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.validation_dock)
         self.validation_dock.hide()
     
+    def create_graph_panel(self):
+        """Create XML graph visualization panel."""
+        self.graph_dock = QDockWidget("XML Graph View", self)
+        self.graph_dock.setObjectName("GraphDock")
+        
+        # Create container widget with layout
+        graph_widget = QWidget()
+        graph_layout = QVBoxLayout(graph_widget)
+        
+        # Add description label
+        info_label = QLabel("Visual node graph of XML structure. Use mouse wheel to zoom, drag to pan.")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: gray; font-size: 10px; padding: 5px;")
+        graph_layout.addWidget(info_label)
+        
+        # Add control buttons
+        button_layout = QHBoxLayout()
+        
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.refresh_graph_view)
+        button_layout.addWidget(refresh_btn)
+        
+        fit_btn = QPushButton("Fit to View")
+        fit_btn.clicked.connect(self.fit_graph_to_view)
+        button_layout.addWidget(fit_btn)
+        
+        button_layout.addStretch()
+        graph_layout.addLayout(button_layout)
+        
+        # Create graph view
+        self.graph_view = XMLGraphView()
+        graph_layout.addWidget(self.graph_view)
+        
+        self.graph_dock.setWidget(graph_widget)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.graph_dock)
+        self.graph_dock.hide()
+    
     def get_current_editor(self):
         """Get the currently active editor widget."""
         current_index = self.tab_widget.currentIndex()
@@ -498,6 +552,9 @@ class MainWindow(QMainWindow):
         if index >= 0:
             self.refresh_tree_view()
             self.update_window_title()
+            # Refresh graph view if visible
+            if self.graph_dock.isVisible():
+                self.refresh_graph_view()
     
     def close_tab(self, index):
         """Close a tab."""
@@ -1056,6 +1113,35 @@ class MainWindow(QMainWindow):
             self.validation_dock.hide()
         else:
             self.validation_dock.show()
+    
+    def toggle_graph_panel(self):
+        """Toggle graph view panel visibility."""
+        if self.graph_dock.isVisible():
+            self.graph_dock.hide()
+        else:
+            self.graph_dock.show()
+            self.refresh_graph_view()
+    
+    def refresh_graph_view(self):
+        """Refresh the XML graph view."""
+        editor = self.get_current_editor()
+        if not editor:
+            self.graph_view.clear()
+            return
+        
+        content = editor.get_text().strip()
+        
+        if content:
+            try:
+                self.graph_view.load_xml(content, self.show_namespaces)
+            except Exception as e:
+                self.statusBar().showMessage(f"Graph view error: {str(e)}", 3000)
+        else:
+            self.graph_view.clear()
+    
+    def fit_graph_to_view(self):
+        """Fit the graph to the view."""
+        self.graph_view.fit_to_view()
             
     def toggle_word_wrap(self, checked):
         """Toggle word wrap in editor."""
