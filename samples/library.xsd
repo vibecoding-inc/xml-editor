@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:element name="library">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="authors">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element name="author" maxOccurs="unbounded">
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element name="name" type="xs:string"/>
+                                        <xs:element name="country" type="xs:string"/>
+                                    </xs:sequence>
+                                    <xs:attribute name="id" type="xs:ID" use="required"/>
+                                </xs:complexType>
+                            </xs:element>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="books">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element name="book" maxOccurs="unbounded">
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element name="title" type="xs:string"/>
+                                        <xs:element name="authorRef" type="xs:IDREF"/>
+                                        <xs:element name="year" type="xs:integer"/>
+                                        <xs:element name="price" type="xs:decimal"/>
+                                    </xs:sequence>
+                                    <xs:attribute name="isbn" type="xs:string" use="required"/>
+                                </xs:complexType>
+                            </xs:element>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+            </xs:sequence>
+        </xs:complexType>
+        
+        <!-- Key definition for author IDs -->
+        <xs:key name="authorKey">
+            <xs:selector xpath="authors/author"/>
+            <xs:field xpath="@id"/>
+        </xs:key>
+        
+        <!-- Key reference from books to authors -->
+        <xs:keyref name="authorReference" refer="authorKey">
+            <xs:selector xpath="books/book"/>
+            <xs:field xpath="authorRef"/>
+        </xs:keyref>
+    </xs:element>
+</xs:schema>

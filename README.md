@@ -22,6 +22,7 @@ A fully-featured cross-platform XML editor desktop application built with Python
 - **Schema Generation**: Generate XSD or DTD schemas from XML documents
 - **XML Formatting**: Automatic formatting and pretty-printing
 - **Tree View**: Visual representation of XML structure that syncs with active tab
+- **Graph View**: Interactive node graph visualization of XML with nesting containers
 
 ### Advanced Features
 - **Side-by-Side Editing**: Edit XML and its schema simultaneously in different tabs
@@ -172,6 +173,7 @@ To change themes, go to **View → Theme** and select your preferred option. You
 | Toggle Tree View | Ctrl+T |
 | Toggle Output Panel | Ctrl+O |
 | Toggle Validation Panel | Ctrl+Shift+P |
+| Toggle Graph View | Ctrl+G |
 | Comment/Uncomment | Ctrl+/ |
 | Refresh Tree | F5 |
 
@@ -188,6 +190,7 @@ This XML Editor includes many features similar to XMLSpy:
 | XPath Queries | ✓ | ✓ |
 | XSLT Transformations | ✓ | ✓ |
 | XML Tree View | ✓ | ✓ |
+| XML Graph View | ✓ | ✓ |
 | XML Formatting | ✓ | ✓ |
 | Find & Replace | ✓ | ✓ |
 | Cross-Platform | ✓ | ✗ (Windows only) |
@@ -206,6 +209,7 @@ xml-editor/
 │   ├── xml_editor.py        # XML editor widget
 │   ├── xml_utils.py         # XML utilities
 │   ├── xml_tree_view.py     # Tree view widget
+│   ├── xml_graph_view.py    # Graph view widget
 │   ├── xpath_dialog.py      # XPath query dialog
 │   ├── validation_dialog.py # Validation dialog
 │   ├── xslt_dialog.py       # XSLT transform dialog
