@@ -6,12 +6,14 @@ import os
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                               QSplitter, QMenuBar, QMenu, QToolBar, QFileDialog, 
                               QMessageBox, QInputDialog, QDockWidget, QTextEdit,
-                              QLabel, QStatusBar, QTabWidget, QPushButton, QTabBar)
+                              QLabel, QStatusBar, QTabWidget, QPushButton, QTabBar,
+                              QComboBox, QCheckBox, QFrame)
 from PyQt6.QtGui import QAction, QKeySequence, QIcon, QActionGroup
 from PyQt6.QtCore import Qt, QSettings, QTimer
 from PyQt6.Qsci import QsciScintilla
 from xmleditor.xml_editor import XMLEditor
 from xmleditor.xml_tree_view import XMLTreeView
+from xmleditor.xml_graph_view import XMLGraphView
 from xmleditor.xpath_dialog import XPathDialog
 from xmleditor.validation_dialog import ValidationDialog
 from xmleditor.xslt_dialog import XSLTDialog
@@ -94,6 +96,9 @@ class MainWindow(QMainWindow):
         
         # Create validation panel as dock widget
         self.create_validation_panel()
+        
+        # Create graph view panel as dock widget
+        self.create_graph_panel()
         
         # Create menu bar
         self.create_menu_bar()
@@ -274,6 +279,12 @@ class MainWindow(QMainWindow):
         toggle_validation_action.triggered.connect(self.toggle_validation_panel)
         view_menu.addAction(toggle_validation_action)
         
+        toggle_graph_action = QAction("Toggle &Graph View", self)
+        toggle_graph_action.setShortcut(QKeySequence("Ctrl+G"))
+        toggle_graph_action.setStatusTip("Toggle XML node graph visualization")
+        toggle_graph_action.triggered.connect(self.toggle_graph_panel)
+        view_menu.addAction(toggle_graph_action)
+        
         view_menu.addSeparator()
         
         word_wrap_action = QAction("Word &Wrap", self)
@@ -358,6 +369,13 @@ class MainWindow(QMainWindow):
         xpath_action = QAction("XPath", self)
         xpath_action.triggered.connect(self.show_xpath_dialog)
         toolbar.addAction(xpath_action)
+        
+        toolbar.addSeparator()
+        
+        graph_action = QAction("Graph", self)
+        graph_action.setStatusTip("Toggle XML node graph visualization")
+        graph_action.triggered.connect(self.toggle_graph_panel)
+        toolbar.addAction(graph_action)
         
     def create_status_bar(self):
         """Create status bar."""
@@ -473,6 +491,189 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.validation_dock)
         self.validation_dock.hide()
     
+    def create_graph_panel(self):
+        """Create XML graph visualization panel."""
+        self.graph_dock = QDockWidget("XML Graph View", self)
+        self.graph_dock.setObjectName("GraphDock")
+        
+        # Create container widget with layout
+        graph_widget = QWidget()
+        graph_layout = QVBoxLayout(graph_widget)
+        graph_layout.setContentsMargins(5, 2, 5, 2)
+        graph_layout.setSpacing(2)
+        
+        # Single compact toolbar row with all controls
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setSpacing(5)
+        
+        # Refresh and Fit buttons
+        refresh_btn = QPushButton("⟳")
+        refresh_btn.setToolTip("Refresh graph")
+        refresh_btn.setMaximumWidth(30)
+        refresh_btn.clicked.connect(self.refresh_graph_view)
+        toolbar_layout.addWidget(refresh_btn)
+        
+        fit_btn = QPushButton("⊡")
+        fit_btn.setToolTip("Fit to view")
+        fit_btn.setMaximumWidth(30)
+        fit_btn.clicked.connect(self.fit_graph_to_view)
+        toolbar_layout.addWidget(fit_btn)
+        
+        toolbar_layout.addWidget(self._create_separator())
+        
+        # Layout algorithm selector
+        layout_label = QLabel("Layout:")
+        layout_label.setStyleSheet("font-size: 10px;")
+        toolbar_layout.addWidget(layout_label)
+        
+        self.graph_layout_combo = QComboBox()
+        self.graph_layout_combo.addItems(["Tree (Top-Down)", "Tree (Left-Right)", "Radial", "Compact"])
+        self.graph_layout_combo.setMaximumWidth(120)
+        self.graph_layout_combo.setToolTip("Select layout algorithm")
+        self.graph_layout_combo.currentIndexChanged.connect(self.on_graph_layout_changed)
+        toolbar_layout.addWidget(self.graph_layout_combo)
+        
+        toolbar_layout.addWidget(self._create_separator())
+        
+        # View mode toggle (Data vs Types)
+        view_mode_label = QLabel("View:")
+        view_mode_label.setStyleSheet("font-size: 10px;")
+        toolbar_layout.addWidget(view_mode_label)
+        
+        self.graph_view_mode_combo = QComboBox()
+        self.graph_view_mode_combo.addItems(["Data", "Types"])
+        self.graph_view_mode_combo.setMaximumWidth(70)
+        self.graph_view_mode_combo.setToolTip("Data: show all XML elements\nTypes: show unique element types (schema-like)")
+        self.graph_view_mode_combo.currentIndexChanged.connect(self.on_graph_view_mode_changed)
+        toolbar_layout.addWidget(self.graph_view_mode_combo)
+        
+        toolbar_layout.addWidget(self._create_separator())
+        
+        # Display checkboxes
+        self.show_connections_cb = QCheckBox("Lines")
+        self.show_connections_cb.setChecked(True)
+        self.show_connections_cb.setToolTip("Show connection lines")
+        self.show_connections_cb.stateChanged.connect(self.on_graph_display_changed)
+        toolbar_layout.addWidget(self.show_connections_cb)
+        
+        self.show_nesting_cb = QCheckBox("Nesting")
+        self.show_nesting_cb.setChecked(True)
+        self.show_nesting_cb.setToolTip("Show nesting containers")
+        self.show_nesting_cb.stateChanged.connect(self.on_graph_display_changed)
+        toolbar_layout.addWidget(self.show_nesting_cb)
+        
+        self.show_keyrefs_cb = QCheckBox("Key Refs")
+        self.show_keyrefs_cb.setChecked(True)
+        self.show_keyrefs_cb.setToolTip("Show key reference lines")
+        self.show_keyrefs_cb.stateChanged.connect(self.on_graph_display_changed)
+        toolbar_layout.addWidget(self.show_keyrefs_cb)
+        
+        toolbar_layout.addWidget(self._create_separator())
+        
+        # Schema controls
+        self.graph_schema_path_label = QLabel("No schema")
+        self.graph_schema_path_label.setStyleSheet("color: gray; font-size: 9px;")
+        self.graph_schema_path_label.setMaximumWidth(80)
+        toolbar_layout.addWidget(self.graph_schema_path_label)
+        
+        load_schema_btn = QPushButton("📂")
+        load_schema_btn.setToolTip("Load XSD schema for key references")
+        load_schema_btn.setMaximumWidth(30)
+        load_schema_btn.clicked.connect(self.load_graph_schema)
+        toolbar_layout.addWidget(load_schema_btn)
+        
+        clear_schema_btn = QPushButton("✕")
+        clear_schema_btn.setToolTip("Clear schema")
+        clear_schema_btn.setMaximumWidth(25)
+        clear_schema_btn.clicked.connect(self.clear_graph_schema)
+        toolbar_layout.addWidget(clear_schema_btn)
+        
+        toolbar_layout.addStretch()
+        graph_layout.addLayout(toolbar_layout)
+        
+        # Store schema file path and content
+        self.graph_schema_file_path = None
+        self.graph_schema_content = None
+        
+        # Create graph view
+        self.graph_view = XMLGraphView()
+        graph_layout.addWidget(self.graph_view)
+        
+        self.graph_dock.setWidget(graph_widget)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.graph_dock)
+        self.graph_dock.hide()
+    
+    def _create_separator(self):
+        """Create a vertical separator line."""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        return separator
+    
+    def on_graph_layout_changed(self, index):
+        """Handle layout algorithm change."""
+        layout_names = ["tree_vertical", "tree_horizontal", "radial", "compact"]
+        if index < len(layout_names):
+            self.graph_view.set_layout_algorithm(layout_names[index])
+            self.refresh_graph_view()
+    
+    def on_graph_view_mode_changed(self, index):
+        """Handle view mode change (Data vs Types)."""
+        view_modes = ["data", "types"]
+        if index < len(view_modes):
+            self.graph_view.set_view_mode(view_modes[index])
+            self.refresh_graph_view()
+    
+    def on_graph_display_changed(self):
+        """Handle display option checkbox changes."""
+        self.graph_view.set_display_options(
+            show_connections=self.show_connections_cb.isChecked(),
+            show_nesting=self.show_nesting_cb.isChecked(),
+            show_keyrefs=self.show_keyrefs_cb.isChecked()
+        )
+    
+    def load_graph_schema(self):
+        """Load XSD schema for key/keyref highlighting in graph view."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Load Schema for Key References", "", 
+            "XSD Schema Files (*.xsd);;All Files (*)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    self.graph_schema_content = f.read()
+                
+                self.graph_schema_file_path = file_path
+                basename = os.path.basename(file_path)
+                # Truncate for compact display
+                display_name = basename[:10] + "..." if len(basename) > 13 else basename
+                self.graph_schema_path_label.setText(display_name)
+                self.graph_schema_path_label.setToolTip(file_path)
+                self.graph_schema_path_label.setStyleSheet("color: green; font-size: 9px;")
+                
+                # Update graph view with schema
+                self.graph_view.set_schema(self.graph_schema_content)
+                self.refresh_graph_view()
+                
+                self.statusBar().showMessage(f"Schema loaded: {basename}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load schema:\n{str(e)}")
+    
+    def clear_graph_schema(self):
+        """Clear the loaded graph schema."""
+        self.graph_schema_file_path = None
+        self.graph_schema_content = None
+        self.graph_schema_path_label.setText("No schema")
+        self.graph_schema_path_label.setToolTip("")
+        self.graph_schema_path_label.setStyleSheet("color: gray; font-size: 9px;")
+        
+        # Update graph view without schema
+        self.graph_view.set_schema(None)
+        self.refresh_graph_view()
+        
+        self.statusBar().showMessage("Schema cleared")
+    
     def get_current_editor(self):
         """Get the currently active editor widget."""
         current_index = self.tab_widget.currentIndex()
@@ -498,6 +699,9 @@ class MainWindow(QMainWindow):
         if index >= 0:
             self.refresh_tree_view()
             self.update_window_title()
+            # Refresh graph view if visible
+            if self.graph_dock.isVisible():
+                self.refresh_graph_view()
     
     def close_tab(self, index):
         """Close a tab."""
@@ -1056,6 +1260,35 @@ class MainWindow(QMainWindow):
             self.validation_dock.hide()
         else:
             self.validation_dock.show()
+    
+    def toggle_graph_panel(self):
+        """Toggle graph view panel visibility."""
+        if self.graph_dock.isVisible():
+            self.graph_dock.hide()
+        else:
+            self.graph_dock.show()
+            self.refresh_graph_view()
+    
+    def refresh_graph_view(self):
+        """Refresh the XML graph view."""
+        editor = self.get_current_editor()
+        if not editor:
+            self.graph_view.clear()
+            return
+        
+        content = editor.get_text().strip()
+        
+        if content:
+            try:
+                self.graph_view.load_xml(content, self.show_namespaces)
+            except Exception as e:
+                self.statusBar().showMessage(f"Graph view error: {str(e)}", 3000)
+        else:
+            self.graph_view.clear()
+    
+    def fit_graph_to_view(self):
+        """Fit the graph to the view."""
+        self.graph_view.fit_to_view()
             
     def toggle_word_wrap(self, checked):
         """Toggle word wrap in editor."""
