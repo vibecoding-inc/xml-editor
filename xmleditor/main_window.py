@@ -708,11 +708,14 @@ class MainWindow(QMainWindow):
         if index < 0 or index >= self.tab_widget.count():
             return
         
-        # Check if tab has unsaved changes
+        # Check if tab has unsaved changes (only prompt if not pristine)
         tab_data = self.tab_data.get(index, {})
-        if tab_data.get('is_modified', False):
-            editor = self.tab_widget.widget(index)
-            file_name = os.path.basename(tab_data.get('file_path', 'Untitled'))
+        is_pristine = tab_data.get('is_pristine', False)
+        is_modified = tab_data.get('is_modified', False)
+        
+        # Only prompt for save if the tab was actually edited by the user (not pristine)
+        if is_modified and not is_pristine:
+            file_name = os.path.basename(tab_data.get('file_path') or 'Untitled')
             
             reply = QMessageBox.question(
                 self, "Unsaved Changes",
@@ -756,9 +759,14 @@ class MainWindow(QMainWindow):
         index = self.tab_widget.addTab(editor, title)
         self.tab_widget.setCurrentIndex(index)
         
+        # Track if this is a pristine untitled tab (never edited by user)
+        # Pristine tabs can be closed without prompting and are auto-closed when opening files
+        is_pristine = file_path is None
+        
         self.tab_data[index] = {
             'file_path': file_path,
-            'is_modified': False
+            'is_modified': False,
+            'is_pristine': is_pristine
         }
         
         self.update_window_title()
@@ -795,6 +803,21 @@ class MainWindow(QMainWindow):
                     QMessageBox.information(self, "File Already Open", 
                                           f"The file {os.path.basename(file_path)} is already open.")
                     return
+            
+            # Close any pristine untitled tabs before opening the new file
+            # Iterate in reverse to avoid index shifting issues
+            for index in range(self.tab_widget.count() - 1, -1, -1):
+                tab_data = self.tab_data.get(index, {})
+                if tab_data.get('is_pristine', False) and tab_data.get('file_path') is None:
+                    self.tab_widget.removeTab(index)
+                    # Update tab_data dictionary (shift indices)
+                    new_tab_data = {}
+                    for i, data in self.tab_data.items():
+                        if i < index:
+                            new_tab_data[i] = data
+                        elif i > index:
+                            new_tab_data[i - 1] = data
+                    self.tab_data = new_tab_data
             
             # Create new tab for the file
             self.create_editor_tab(
@@ -1322,6 +1345,11 @@ class MainWindow(QMainWindow):
         current_index = self.tab_widget.currentIndex()
         if current_index >= 0:
             tab_data = self.tab_data.get(current_index, {})
+            # Only mark as not pristine if this is a user edit (not initial content loading)
+            # We detect this by checking if is_modified was already False (initial state)
+            if not tab_data.get('is_modified', False):
+                # First change - mark as no longer pristine (user has edited)
+                tab_data['is_pristine'] = False
             tab_data['is_modified'] = True
             self.tab_data[current_index] = tab_data
             self.update_window_title()
@@ -1353,7 +1381,11 @@ class MainWindow(QMainWindow):
         """Check if there are unsaved changes in any tab and prompt user."""
         for index in range(self.tab_widget.count()):
             tab_data = self.tab_data.get(index, {})
-            if tab_data.get('is_modified', False):
+            is_modified = tab_data.get('is_modified', False)
+            is_pristine = tab_data.get('is_pristine', False)
+            
+            # Only prompt for save if the tab was actually edited by the user (not pristine)
+            if is_modified and not is_pristine:
                 file_path = tab_data.get('file_path')
                 file_name = os.path.basename(file_path) if file_path else 'Untitled'
                 
