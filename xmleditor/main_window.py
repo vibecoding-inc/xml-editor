@@ -694,8 +694,12 @@ class MainWindow(QMainWindow):
         # Create tab widget for result display
         self.xslt_result_tabs = QTabWidget()
         
+        # Tab indices for result tabs
+        self.XSLT_XML_OUTPUT_TAB = 0
+        self.XSLT_HTML_PREVIEW_TAB = 1
+        
         # Tab 1: XML/Text output with syntax highlighting
-        self.xslt_result_editor = XMLEditor(self, self.current_theme)
+        self.xslt_result_editor = XMLEditor(theme_type=self.current_theme)
         self.xslt_result_editor.setReadOnly(True)
         self.xslt_result_tabs.addTab(self.xslt_result_editor, "XML Output")
         
@@ -1303,7 +1307,7 @@ class MainWindow(QMainWindow):
             # setOpenLinks(False) prevents link activation as additional security measure
             self.xslt_result_browser.setHtml(result)
             # Set default tab to XML output
-            self.xslt_result_tabs.setCurrentIndex(0)
+            self.xslt_result_tabs.setCurrentIndex(self.XSLT_XML_OUTPUT_TAB)
             self.statusBar().showMessage("XSLT transformation completed successfully", 3000)
         except Exception as e:
             error_msg = f"Transformation failed:\n{str(e)}"
@@ -1315,7 +1319,7 @@ class MainWindow(QMainWindow):
             error_html = f"<div style='color: #cc0000; font-family: monospace; white-space: pre-wrap;'>{escaped_msg}</div>"
             self.xslt_result_browser.setHtml(error_html)
             # Set default tab to XML output
-            self.xslt_result_tabs.setCurrentIndex(0)
+            self.xslt_result_tabs.setCurrentIndex(self.XSLT_XML_OUTPUT_TAB)
         
     def show_xpath_dialog(self):
         """Open XPath query dialog."""
