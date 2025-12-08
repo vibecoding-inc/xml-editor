@@ -118,6 +118,9 @@ class XQueryPanel(QWidget):
         self.file_watcher = QFileSystemWatcher()
         self.file_watcher.fileChanged.connect(self.on_file_changed)
         
+        # Configuration constants
+        self.MAX_RESULT_DISPLAY_LENGTH = 500  # Maximum characters to display per result
+        
         # Timer for auto-save
         self.save_timer = QTimer()
         self.save_timer.setSingleShot(True)
@@ -372,8 +375,8 @@ class XQueryPanel(QWidget):
             for i, result in enumerate(results, 1):
                 result_str = str(result).strip()
                 # Limit display length for very long results
-                if len(result_str) > 500:
-                    result_str = result_str[:500] + "..."
+                if len(result_str) > self.MAX_RESULT_DISPLAY_LENGTH:
+                    result_str = result_str[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
                 
                 item = QListWidgetItem(f"[{i}] {result_str}")
                 item.setForeground(QColor(theme.get_color('text')))

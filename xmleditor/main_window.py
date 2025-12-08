@@ -1361,7 +1361,9 @@ class MainWindow(QMainWindow):
             self.xslt_result_editor.set_text(error_msg)
             # Display error in consistent HTML format with proper escaping
             escaped_msg = html.escape(error_msg)
-            error_html = f"<div style='color: #cc0000; font-family: monospace; white-space: pre-wrap;'>{escaped_msg}</div>"
+            theme = ThemeManager.get_theme(self.current_theme)
+            error_color = theme.get_color('red')
+            error_html = f"<div style='color: {error_color}; font-family: monospace; white-space: pre-wrap;'>{escaped_msg}</div>"
             self.xslt_result_browser.setHtml(error_html)
             # Set default tab to XML output
             self.xslt_result_tabs.setCurrentIndex(self.XSLT_XML_OUTPUT_TAB)
