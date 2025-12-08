@@ -165,14 +165,8 @@ class XQueryPanel(QWidget):
         # XQuery editor
         top_layout.addWidget(QLabel("XQuery Expression (XPath 3.0):"))
         self.xquery_editor = XQueryEditor(theme_type=self.theme_type)
-        self.xquery_editor.setPlaceholderText(
-            "Enter XQuery expression here...\n"
-            "Examples:\n"
-            "  //book/title\n"
-            "  for $b in //book return $b/title\n"
-            "  //book[price > 15]/title/text()\n"
-            "  count(//book)"
-        )
+        # QScintilla doesn't support setPlaceholderText, so we add example text initially
+        # which will be replaced when a file is loaded or user starts typing
         self.xquery_editor.textChanged.connect(self.on_text_changed)
         top_layout.addWidget(self.xquery_editor)
         
