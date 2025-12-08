@@ -687,14 +687,25 @@ class MainWindow(QMainWindow):
         transform_btn.clicked.connect(self.apply_xslt_transformation)
         xslt_layout.addWidget(transform_btn)
         
-        # Result display area
+        # Result display area with tabs
         result_label = QLabel("Transformation Result:")
         xslt_layout.addWidget(result_label)
         
+        # Create tab widget for result display
+        self.xslt_result_tabs = QTabWidget()
+        
+        # Tab 1: XML/Text output with syntax highlighting
+        self.xslt_result_editor = XMLEditor(self, self.current_theme)
+        self.xslt_result_editor.setReadOnly(True)
+        self.xslt_result_tabs.addTab(self.xslt_result_editor, "XML Output")
+        
+        # Tab 2: HTML preview
         self.xslt_result_browser = QTextBrowser()
         # Disable link activation for security (QTextBrowser doesn't support JavaScript)
         self.xslt_result_browser.setOpenLinks(False)
-        xslt_layout.addWidget(self.xslt_result_browser)
+        self.xslt_result_tabs.addTab(self.xslt_result_browser, "HTML Preview")
+        
+        xslt_layout.addWidget(self.xslt_result_tabs)
         
         self.xslt_dock.setWidget(xslt_widget)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.xslt_dock)
@@ -1284,18 +1295,27 @@ class MainWindow(QMainWindow):
         # Apply transformation
         try:
             result = XMLUtilities.apply_xslt(xml_content, xslt_content)
-            # Display result as HTML in the browser widget
+            # Display result in both tabs
+            # Tab 1: XML output with syntax highlighting (default view)
+            self.xslt_result_editor.set_text(result)
+            # Tab 2: HTML preview
             # Safe: QTextBrowser doesn't support JavaScript, only limited HTML/CSS subset
             # setOpenLinks(False) prevents link activation as additional security measure
             self.xslt_result_browser.setHtml(result)
+            # Set default tab to XML output
+            self.xslt_result_tabs.setCurrentIndex(0)
             self.statusBar().showMessage("XSLT transformation completed successfully", 3000)
         except Exception as e:
             error_msg = f"Transformation failed:\n{str(e)}"
             QMessageBox.critical(self, "Error", error_msg)
+            # Display error in both tabs
+            self.xslt_result_editor.set_text(error_msg)
             # Display error in consistent HTML format with proper escaping
             escaped_msg = html.escape(error_msg)
             error_html = f"<div style='color: #cc0000; font-family: monospace; white-space: pre-wrap;'>{escaped_msg}</div>"
             self.xslt_result_browser.setHtml(error_html)
+            # Set default tab to XML output
+            self.xslt_result_tabs.setCurrentIndex(0)
         
     def show_xpath_dialog(self):
         """Open XPath query dialog."""
