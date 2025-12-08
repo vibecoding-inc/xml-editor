@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                               QSplitter, QMenuBar, QMenu, QToolBar, QFileDialog, 
                               QMessageBox, QInputDialog, QDockWidget, QTextEdit,
                               QLabel, QStatusBar, QTabWidget, QPushButton, QTabBar,
-                              QComboBox, QCheckBox, QFrame)
+                              QComboBox, QCheckBox, QFrame, QTextBrowser)
 from PyQt6.QtGui import QAction, QKeySequence, QIcon, QActionGroup
 from PyQt6.QtCore import Qt, QSettings, QTimer
 from PyQt6.Qsci import QsciScintilla
@@ -99,6 +99,9 @@ class MainWindow(QMainWindow):
         
         # Create graph view panel as dock widget
         self.create_graph_panel()
+        
+        # Create XSLT panel as dock widget
+        self.create_xslt_panel()
         
         # Create menu bar
         self.create_menu_bar()
@@ -250,7 +253,7 @@ class MainWindow(QMainWindow):
         xslt_action = QAction("XS&LT Transform...", self)
         xslt_action.setShortcut(QKeySequence("Ctrl+Shift+T"))
         xslt_action.setStatusTip("Apply XSLT transformation")
-        xslt_action.triggered.connect(self.show_xslt_dialog)
+        xslt_action.triggered.connect(self.toggle_xslt_panel)
         xml_menu.addAction(xslt_action)
         
         xml_menu.addSeparator()
@@ -284,6 +287,12 @@ class MainWindow(QMainWindow):
         toggle_graph_action.setStatusTip("Toggle XML node graph visualization")
         toggle_graph_action.triggered.connect(self.toggle_graph_panel)
         view_menu.addAction(toggle_graph_action)
+        
+        toggle_xslt_action = QAction("Toggle XS&LT Panel", self)
+        toggle_xslt_action.setShortcut(QKeySequence("Ctrl+L"))
+        toggle_xslt_action.setStatusTip("Toggle XSLT transformation panel")
+        toggle_xslt_action.triggered.connect(self.toggle_xslt_panel)
+        view_menu.addAction(toggle_xslt_action)
         
         view_menu.addSeparator()
         
@@ -602,6 +611,92 @@ class MainWindow(QMainWindow):
         self.graph_dock.setWidget(graph_widget)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.graph_dock)
         self.graph_dock.hide()
+    
+    def create_xslt_panel(self):
+        """Create XSLT transformation panel."""
+        self.xslt_dock = QDockWidget("XSLT Transform", self)
+        self.xslt_dock.setObjectName("XSLTDock")
+        xslt_widget = QWidget()
+        xslt_layout = QVBoxLayout(xslt_widget)
+        
+        # XSLT stylesheet input area with tabs
+        stylesheet_label = QLabel("XSLT Stylesheet:")
+        xslt_layout.addWidget(stylesheet_label)
+        
+        # Create tab widget for XSLT input methods
+        self.xslt_input_tabs = QTabWidget()
+        
+        # Tab 1: Text input
+        text_input_widget = QWidget()
+        text_input_layout = QVBoxLayout(text_input_widget)
+        
+        self.xslt_text_input = QTextEdit()
+        self.xslt_text_input.setPlaceholderText("Paste XSLT stylesheet here...")
+        self.xslt_text_input.setMaximumHeight(150)
+        text_input_layout.addWidget(self.xslt_text_input)
+        
+        text_file_layout = QHBoxLayout()
+        load_xslt_btn = QPushButton("Load from File")
+        load_xslt_btn.clicked.connect(self.load_xslt_text_file)
+        text_file_layout.addWidget(load_xslt_btn)
+        text_file_layout.addStretch()
+        text_input_layout.addLayout(text_file_layout)
+        
+        self.xslt_input_tabs.addTab(text_input_widget, "Text Input")
+        
+        # Tab 2: File picker
+        file_picker_widget = QWidget()
+        file_picker_layout = QVBoxLayout(file_picker_widget)
+        
+        # File path display and picker
+        file_path_layout = QHBoxLayout()
+        file_path_layout.addWidget(QLabel("XSLT File:"))
+        
+        self.xslt_file_path_label = QLabel("No file selected")
+        self.xslt_file_path_label.setStyleSheet("color: gray; font-style: italic;")
+        file_path_layout.addWidget(self.xslt_file_path_label, 1)
+        
+        select_xslt_file_btn = QPushButton("Browse...")
+        select_xslt_file_btn.clicked.connect(self.select_xslt_file)
+        file_path_layout.addWidget(select_xslt_file_btn)
+        
+        clear_xslt_file_btn = QPushButton("Clear")
+        clear_xslt_file_btn.clicked.connect(self.clear_xslt_file)
+        file_path_layout.addWidget(clear_xslt_file_btn)
+        
+        file_picker_layout.addLayout(file_path_layout)
+        
+        # Info label
+        info_label = QLabel("The XSLT file will be reloaded from disk each time transformation is performed.")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: gray; font-size: 10px;")
+        file_picker_layout.addWidget(info_label)
+        
+        file_picker_layout.addStretch()
+        
+        self.xslt_input_tabs.addTab(file_picker_widget, "File Path")
+        
+        xslt_layout.addWidget(self.xslt_input_tabs)
+        
+        # Store XSLT file path
+        self.xslt_file_path = None
+        
+        # Transform button
+        transform_btn = QPushButton("Transform")
+        transform_btn.clicked.connect(self.apply_xslt_transformation)
+        xslt_layout.addWidget(transform_btn)
+        
+        # Result display area
+        result_label = QLabel("Transformation Result:")
+        xslt_layout.addWidget(result_label)
+        
+        self.xslt_result_browser = QTextBrowser()
+        self.xslt_result_browser.setOpenExternalLinks(False)
+        xslt_layout.addWidget(self.xslt_result_browser)
+        
+        self.xslt_dock.setWidget(xslt_widget)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.xslt_dock)
+        self.xslt_dock.hide()
     
     def _create_separator(self):
         """Create a vertical separator line."""
@@ -1118,6 +1213,82 @@ class MainWindow(QMainWindow):
         self.schema_file_path_label.setText("No file selected")
         self.schema_file_path_label.setToolTip("")
         self.schema_file_path_label.setStyleSheet("color: gray; font-style: italic;")
+    
+    def load_xslt_text_file(self):
+        """Load XSLT file for text input tab."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open XSLT Stylesheet", "", "XSLT Files (*.xsl *.xslt);;All Files (*)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    self.xslt_text_input.setPlainText(f.read())
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load file:\n{str(e)}")
+    
+    def select_xslt_file(self):
+        """Select XSLT file for file path tab."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select XSLT Stylesheet", "", "XSLT Files (*.xsl *.xslt);;All Files (*)"
+        )
+        
+        if file_path:
+            self.xslt_file_path = file_path
+            # Display just the filename with full path as tooltip
+            self.xslt_file_path_label.setText(os.path.basename(file_path))
+            self.xslt_file_path_label.setToolTip(file_path)
+            self.xslt_file_path_label.setStyleSheet("color: black; font-style: normal;")
+    
+    def clear_xslt_file(self):
+        """Clear the selected XSLT file path."""
+        self.xslt_file_path = None
+        self.xslt_file_path_label.setText("No file selected")
+        self.xslt_file_path_label.setToolTip("")
+        self.xslt_file_path_label.setStyleSheet("color: gray; font-style: italic;")
+    
+    def apply_xslt_transformation(self):
+        """Apply XSLT transformation and display result."""
+        editor = self.get_current_editor()
+        if not editor:
+            QMessageBox.warning(self, "Warning", "No document to transform")
+            return
+        
+        xml_content = editor.get_text().strip()
+        if not xml_content:
+            QMessageBox.warning(self, "Warning", "No XML content to transform")
+            return
+        
+        # Get XSLT content based on active tab
+        xslt_content = None
+        if self.xslt_input_tabs.currentIndex() == 0:
+            # Text input tab
+            xslt_content = self.xslt_text_input.toPlainText().strip()
+            if not xslt_content:
+                QMessageBox.warning(self, "Warning", "Please provide an XSLT stylesheet")
+                return
+        else:
+            # File path tab
+            if not self.xslt_file_path:
+                QMessageBox.warning(self, "Warning", "Please select an XSLT file")
+                return
+            try:
+                with open(self.xslt_file_path, 'r', encoding='utf-8') as f:
+                    xslt_content = f.read()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load XSLT file:\n{str(e)}")
+                return
+        
+        # Apply transformation
+        try:
+            result = XMLUtilities.apply_xslt(xml_content, xslt_content)
+            # Display result as HTML in the browser widget
+            self.xslt_result_browser.setHtml(result)
+            self.statusBar().showMessage("XSLT transformation completed successfully", 3000)
+        except Exception as e:
+            error_msg = f"Transformation failed:\n{str(e)}"
+            QMessageBox.critical(self, "Error", error_msg)
+            self.xslt_result_browser.setPlainText(error_msg)
         
     def show_xpath_dialog(self):
         """Open XPath query dialog."""
@@ -1291,6 +1462,13 @@ class MainWindow(QMainWindow):
         else:
             self.graph_dock.show()
             self.refresh_graph_view()
+    
+    def toggle_xslt_panel(self):
+        """Toggle XSLT panel visibility."""
+        if self.xslt_dock.isVisible():
+            self.xslt_dock.hide()
+        else:
+            self.xslt_dock.show()
     
     def refresh_graph_view(self):
         """Refresh the XML graph view."""
