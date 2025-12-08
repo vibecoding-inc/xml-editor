@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                               QSplitter, QFrame, QLineEdit)
 from PyQt6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.Qsci import QsciScintilla, QsciLexerXML
+from PyQt6.Qsci import QsciScintilla
 from xmleditor.xml_utils import XMLUtilities
 from xmleditor.theme_manager import ThemeManager, ThemeType
 
@@ -244,8 +244,11 @@ class XQueryPanel(QWidget):
                 content = f.read()
             
             # Stop watching old file
-            if self.xquery_file_path and self.xquery_file_path in self.file_watcher.files():
-                self.file_watcher.removePath(self.xquery_file_path)
+            if self.xquery_file_path:
+                try:
+                    self.file_watcher.removePath(self.xquery_file_path)
+                except:
+                    pass  # Path may not be watched, ignore
             
             # Set new file
             self.xquery_file_path = file_path
@@ -290,8 +293,10 @@ class XQueryPanel(QWidget):
         
         try:
             # Temporarily stop watching to avoid triggering our own change
-            if self.xquery_file_path in self.file_watcher.files():
+            try:
                 self.file_watcher.removePath(self.xquery_file_path)
+            except:
+                pass  # Path may not be watched, ignore
             
             with open(self.xquery_file_path, 'w', encoding='utf-8') as f:
                 f.write(self.xquery_editor.get_text())
@@ -322,6 +327,9 @@ class XQueryPanel(QWidget):
         # Execute the query
         success, message, results = XMLUtilities.execute_xquery(xml_content, xquery)
         
+        # Get current theme colors
+        theme = ThemeManager.get_theme(self.theme_type)
+        
         if success:
             # Format results
             if results:
@@ -331,13 +339,16 @@ class XQueryPanel(QWidget):
                     result_text += f"Result {i}:\n"
                     result_text += str(result) + "\n\n"
                 self.result_display.setPlainText(result_text)
-                self.result_display.setStyleSheet("color: green;")
+                # Use theme green color for success
+                self.result_display.setStyleSheet(f"color: {theme.get_color('green')};")
             else:
                 self.result_display.setPlainText(message)
-                self.result_display.setStyleSheet("color: blue;")
+                # Use theme blue color for empty results
+                self.result_display.setStyleSheet(f"color: {theme.get_color('blue')};")
         else:
             self.result_display.setPlainText(f"Error:\n{message}")
-            self.result_display.setStyleSheet("color: red;")
+            # Use theme red color for errors
+            self.result_display.setStyleSheet(f"color: {theme.get_color('red')};")
     
     def apply_theme(self, theme_type):
         """Apply theme to the panel."""
