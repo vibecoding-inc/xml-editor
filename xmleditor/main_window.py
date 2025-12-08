@@ -3,6 +3,7 @@ Main window for the XML Editor application.
 """
 
 import os
+import html
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                               QSplitter, QMenuBar, QMenu, QToolBar, QFileDialog, 
                               QMessageBox, QInputDialog, QDockWidget, QTextEdit,
@@ -692,6 +693,7 @@ class MainWindow(QMainWindow):
         
         self.xslt_result_browser = QTextBrowser()
         self.xslt_result_browser.setOpenExternalLinks(False)
+        self.xslt_result_browser.setOpenLinks(False)
         xslt_layout.addWidget(self.xslt_result_browser)
         
         self.xslt_dock.setWidget(xslt_widget)
@@ -1283,12 +1285,17 @@ class MainWindow(QMainWindow):
         try:
             result = XMLUtilities.apply_xslt(xml_content, xslt_content)
             # Display result as HTML in the browser widget
+            # Note: User controls both XML and XSLT inputs, so content is trusted
+            # QTextBrowser with setOpenLinks(False) prevents link activation for security
             self.xslt_result_browser.setHtml(result)
             self.statusBar().showMessage("XSLT transformation completed successfully", 3000)
         except Exception as e:
             error_msg = f"Transformation failed:\n{str(e)}"
             QMessageBox.critical(self, "Error", error_msg)
-            self.xslt_result_browser.setPlainText(error_msg)
+            # Display error in consistent HTML format with proper escaping
+            escaped_msg = html.escape(error_msg)
+            error_html = f"<div style='color: #cc0000; font-family: monospace; white-space: pre-wrap;'>{escaped_msg}</div>"
+            self.xslt_result_browser.setHtml(error_html)
         
     def show_xpath_dialog(self):
         """Open XPath query dialog."""
