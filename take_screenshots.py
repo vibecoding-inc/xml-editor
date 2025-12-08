@@ -29,8 +29,8 @@ def take_screenshots():
         print("Step 1: Loading sample XML...")
         try:
             window.load_file("/tmp/xquery_test/sample.xml")
-        except Exception as e:
-            print(f"  Warning: {e}")
+        except (FileNotFoundError, OSError) as e:
+            print(f"  Warning: Could not load XML file: {e}")
         QTimer.singleShot(800, step2_open_xquery_panel)
     
     def step2_open_xquery_panel():
@@ -40,8 +40,8 @@ def take_screenshots():
             window.toggle_xquery_panel()
             # Resize the dock to be more visible
             window.xquery_dock.resize(600, 900)
-        except Exception as e:
-            print(f"  Warning: {e}")
+        except (AttributeError, RuntimeError) as e:
+            print(f"  Warning: Could not open XQuery panel: {e}")
         QTimer.singleShot(800, step3_load_query)
     
     def step3_load_query():
@@ -49,8 +49,8 @@ def take_screenshots():
         print("Step 3: Loading sample query...")
         try:
             window.xquery_panel.load_file("/tmp/xquery_test/sample.xq")
-        except Exception as e:
-            print(f"  Warning: {e}")
+        except (FileNotFoundError, OSError, AttributeError) as e:
+            print(f"  Warning: Could not load query file: {e}")
         QTimer.singleShot(800, step4_take_screenshot_before)
     
     def step4_take_screenshot_before():
@@ -71,8 +71,8 @@ def take_screenshots():
         print("Step 5: Executing query...")
         try:
             window.xquery_panel.execute_query()
-        except Exception as e:
-            print(f"  Warning: {e}")
+        except (RuntimeError, AttributeError) as e:
+            print(f"  Warning: Query execution failed: {e}")
         QTimer.singleShot(800, step6_take_screenshot_after)
     
     def step6_take_screenshot_after():

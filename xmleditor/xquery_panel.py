@@ -165,8 +165,8 @@ class XQueryPanel(QWidget):
         # XQuery editor
         top_layout.addWidget(QLabel("XQuery Expression (XPath 3.0):"))
         self.xquery_editor = XQueryEditor(theme_type=self.theme_type)
-        # QScintilla doesn't support setPlaceholderText, so we add example text initially
-        # which will be replaced when a file is loaded or user starts typing
+        # Note: QScintilla doesn't support setPlaceholderText
+        # Users can start typing or load a file to populate the editor
         self.xquery_editor.textChanged.connect(self.on_text_changed)
         top_layout.addWidget(self.xquery_editor)
         
