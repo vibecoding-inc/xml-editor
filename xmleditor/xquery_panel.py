@@ -5,7 +5,7 @@ XQuery panel for executing XQuery expressions with file-based editor.
 import os
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QTextEdit, QFileDialog, QMessageBox,
-                              QSplitter, QFrame, QLineEdit)
+                              QSplitter, QFrame, QLineEdit, QListWidget, QListWidgetItem)
 from PyQt6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.Qsci import QsciScintilla
@@ -182,13 +182,34 @@ class XQueryPanel(QWidget):
         bottom_layout = QVBoxLayout(bottom_widget)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
         
-        bottom_layout.addWidget(QLabel("Results:"))
-        self.result_display = QTextEdit()
-        self.result_display.setReadOnly(True)
-        self.result_display.setPlaceholderText("Query results will appear here...")
+        # Status bar at the top
+        status_frame = QFrame()
+        status_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        status_layout = QHBoxLayout(status_frame)
+        status_layout.setContentsMargins(8, 4, 8, 4)
+        
+        status_layout.addWidget(QLabel("Status:"))
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet("font-weight: bold;")
+        status_layout.addWidget(self.status_label)
+        
+        status_layout.addStretch()
+        
+        self.result_count_label = QLabel("")
+        status_layout.addWidget(self.result_count_label)
+        
+        bottom_layout.addWidget(status_frame)
+        
+        # Results list widget
+        results_label = QLabel("Results:")
+        bottom_layout.addWidget(results_label)
+        
+        self.result_list = QListWidget()
+        self.result_list.setAlternatingRowColors(True)
+        self.result_list.setWordWrap(True)
         font = QFont("Courier New", 9)
-        self.result_display.setFont(font)
-        bottom_layout.addWidget(self.result_display)
+        self.result_list.setFont(font)
+        bottom_layout.addWidget(self.result_list)
         
         splitter.addWidget(bottom_widget)
         
@@ -306,7 +327,7 @@ class XQueryPanel(QWidget):
         xquery = self.xquery_editor.get_text().strip()
         
         if not xquery:
-            self.result_display.setPlainText("Error: No XQuery expression provided")
+            self.show_error("No XQuery expression provided")
             return
         
         # Get the current XML content
@@ -315,34 +336,57 @@ class XQueryPanel(QWidget):
             xml_content = self.get_xml_callback()
         
         if not xml_content or not xml_content.strip():
-            self.result_display.setPlainText("Error: No XML document is currently open")
+            self.show_error("No XML document is currently open")
             return
         
         # Execute the query
         success, message, results = XMLUtilities.execute_xquery(xml_content, xquery)
         
-        # Get current theme colors
+        if success:
+            self.show_results(message, results)
+        else:
+            self.show_error(message)
+    
+    def show_error(self, message):
+        """Display an error message."""
+        theme = ThemeManager.get_theme(self.theme_type)
+        self.status_label.setText("Error")
+        self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('red')};")
+        self.result_count_label.setText("")
+        
+        self.result_list.clear()
+        item = QListWidgetItem(f"❌ {message}")
+        item.setForeground(QColor(theme.get_color('red')))
+        self.result_list.addItem(item)
+    
+    def show_results(self, message, results):
+        """Display query results."""
         theme = ThemeManager.get_theme(self.theme_type)
         
-        if success:
-            # Format results
-            if results:
-                result_text = f"{message}\n\n"
-                result_text += "=" * 60 + "\n\n"
-                for i, result in enumerate(results, 1):
-                    result_text += f"Result {i}:\n"
-                    result_text += str(result) + "\n\n"
-                self.result_display.setPlainText(result_text)
-                # Use theme green color for success
-                self.result_display.setStyleSheet(f"color: {theme.get_color('green')};")
-            else:
-                self.result_display.setPlainText(message)
-                # Use theme blue color for empty results
-                self.result_display.setStyleSheet(f"color: {theme.get_color('blue')};")
+        if results:
+            self.status_label.setText("Success")
+            self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('green')};")
+            self.result_count_label.setText(f"{len(results)} result(s)")
+            
+            self.result_list.clear()
+            for i, result in enumerate(results, 1):
+                result_str = str(result).strip()
+                # Limit display length for very long results
+                if len(result_str) > 500:
+                    result_str = result_str[:500] + "..."
+                
+                item = QListWidgetItem(f"[{i}] {result_str}")
+                item.setForeground(QColor(theme.get_color('text')))
+                self.result_list.addItem(item)
         else:
-            self.result_display.setPlainText(f"Error:\n{message}")
-            # Use theme red color for errors
-            self.result_display.setStyleSheet(f"color: {theme.get_color('red')};")
+            self.status_label.setText("Success")
+            self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('blue')};")
+            self.result_count_label.setText("0 results")
+            
+            self.result_list.clear()
+            item = QListWidgetItem("ℹ️ Query executed successfully (empty result)")
+            item.setForeground(QColor(theme.get_color('blue')))
+            self.result_list.addItem(item)
     
     def apply_theme(self, theme_type):
         """Apply theme to the panel."""
