@@ -692,7 +692,7 @@ class MainWindow(QMainWindow):
         xslt_layout.addWidget(result_label)
         
         self.xslt_result_browser = QTextBrowser()
-        self.xslt_result_browser.setOpenExternalLinks(False)
+        # Disable link activation for security (QTextBrowser doesn't support JavaScript)
         self.xslt_result_browser.setOpenLinks(False)
         xslt_layout.addWidget(self.xslt_result_browser)
         
@@ -1285,8 +1285,8 @@ class MainWindow(QMainWindow):
         try:
             result = XMLUtilities.apply_xslt(xml_content, xslt_content)
             # Display result as HTML in the browser widget
-            # Note: User controls both XML and XSLT inputs, so content is trusted
-            # QTextBrowser with setOpenLinks(False) prevents link activation for security
+            # Safe: QTextBrowser doesn't support JavaScript, only limited HTML/CSS subset
+            # setOpenLinks(False) prevents link activation as additional security measure
             self.xslt_result_browser.setHtml(result)
             self.statusBar().showMessage("XSLT transformation completed successfully", 3000)
         except Exception as e:
