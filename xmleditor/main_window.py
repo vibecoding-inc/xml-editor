@@ -627,6 +627,10 @@ class MainWindow(QMainWindow):
         # Create tab widget for XSLT input methods
         self.xslt_input_tabs = QTabWidget()
         
+        # Tab indices for input tabs
+        self.XSLT_TEXT_INPUT_TAB = 0
+        self.XSLT_FILE_PATH_TAB = 1
+        
         # Tab 1: Text input
         text_input_widget = QWidget()
         text_input_layout = QVBoxLayout(text_input_widget)
@@ -1278,7 +1282,7 @@ class MainWindow(QMainWindow):
         
         # Get XSLT content based on active tab
         xslt_content = None
-        if self.xslt_input_tabs.currentIndex() == 0:
+        if self.xslt_input_tabs.currentIndex() == self.XSLT_TEXT_INPUT_TAB:
             # Text input tab
             xslt_content = self.xslt_text_input.toPlainText().strip()
             if not xslt_content:
