@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                               QPushButton, QTextEdit, QFileDialog, QMessageBox,
                               QSplitter, QFrame, QLineEdit)
 from PyQt6.QtCore import Qt, QTimer, QFileSystemWatcher
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 from PyQt6.Qsci import QsciScintilla, QsciLexerXML
 from xmleditor.xml_utils import XMLUtilities
 from xmleditor.theme_manager import ThemeManager, ThemeType
@@ -70,34 +70,33 @@ class XQueryEditor(QsciScintilla):
     def apply_theme(self, theme_type):
         """Apply a theme to the editor."""
         self.theme_type = theme_type
-        colors = ThemeManager.get_theme_colors(theme_type)
+        theme = ThemeManager.get_theme(theme_type)
         
         # Set colors
-        self.setCaretForegroundColor(colors['caret'])
-        self.setCaretLineBackgroundColor(colors['caret_line_bg'])
+        self.setCaretForegroundColor(QColor(theme.get_color("text")))
+        self.setCaretLineBackgroundColor(QColor(theme.get_color("caret_line")))
         
         # Set margin colors
-        self.setMarginsBackgroundColor(colors['margin_bg'])
-        self.setMarginsForegroundColor(colors['margin_fg'])
+        self.setMarginsBackgroundColor(QColor(theme.get_color("surface0")))
+        self.setMarginsForegroundColor(QColor(theme.get_color("subtext1")))
         
         # Set selection colors
-        self.setSelectionBackgroundColor(colors['selection_bg'])
-        self.setSelectionForegroundColor(colors['selection_fg'])
+        self.setSelectionBackgroundColor(QColor(theme.get_color("selection")))
+        self.setSelectionForegroundColor(QColor(theme.get_color("text")))
         
         # Set matched brace colors
-        self.setMatchedBraceBackgroundColor(colors['matched_brace'])
-        self.setMatchedBraceForegroundColor(colors['fg'])
+        self.setMatchedBraceBackgroundColor(QColor(theme.get_color("matched_brace")))
+        self.setMatchedBraceForegroundColor(QColor(theme.get_color("text")))
         
         # Set unmatched brace colors  
-        self.setUnmatchedBraceBackgroundColor(colors['unmatched_brace'])
-        self.setUnmatchedBraceForegroundColor(colors['fg'])
+        self.setUnmatchedBraceForegroundColor(QColor(theme.get_color("red")))
         
         # Set general editor colors
-        self.setPaper(colors['bg'])
-        self.setColor(colors['fg'])
+        self.setPaper(QColor(theme.get_color("base")))
+        self.setColor(QColor(theme.get_color("text")))
         
         # Set edge color
-        self.setEdgeColor(colors['edge'])
+        self.setEdgeColor(QColor(theme.get_color("edge_color")))
     
     def get_text(self):
         """Get editor text."""
@@ -245,7 +244,7 @@ class XQueryPanel(QWidget):
                 content = f.read()
             
             # Stop watching old file
-            if self.xquery_file_path:
+            if self.xquery_file_path and self.xquery_file_path in self.file_watcher.files():
                 self.file_watcher.removePath(self.xquery_file_path)
             
             # Set new file
@@ -291,7 +290,8 @@ class XQueryPanel(QWidget):
         
         try:
             # Temporarily stop watching to avoid triggering our own change
-            self.file_watcher.removePath(self.xquery_file_path)
+            if self.xquery_file_path in self.file_watcher.files():
+                self.file_watcher.removePath(self.xquery_file_path)
             
             with open(self.xquery_file_path, 'w', encoding='utf-8') as f:
                 f.write(self.xquery_editor.get_text())

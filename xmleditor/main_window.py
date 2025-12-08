@@ -296,7 +296,6 @@ class MainWindow(QMainWindow):
         view_menu.addAction(toggle_graph_action)
         
         toggle_xquery_action = QAction("Toggle X&Query Panel", self)
-        toggle_xquery_action.setShortcut(QKeySequence("Ctrl+Shift+Q"))
         toggle_xquery_action.setStatusTip("Toggle XQuery execution panel")
         toggle_xquery_action.triggered.connect(self.toggle_xquery_panel)
         view_menu.addAction(toggle_xquery_action)
