@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "A fully-featured cross-platform XML editor with XPath, validation, and schema support"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "XML Editor Team"}
 ]
@@ -16,7 +16,6 @@ keywords = ["xml", "editor", "xpath", "xsd", "xslt", "validation", "schema"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
