@@ -643,12 +643,16 @@ class XMLUtilities:
         query = re.sub(r'doc\([^)]+\)', '', query)  # Remove doc() calls
         query = re.sub(r'collection\([^)]+\)', '()', query)  # Empty sequence for collection
         
-        # Step 7: Remove outer element wrapper if present
+        # Step 7: Remove outer element wrapper(s) if present (handle nesting)
         query_stripped = query.strip()
-        if query_stripped.startswith('<') and query_stripped.endswith('>'):
+        # Recursively remove element wrappers to handle nested structures
+        while query_stripped.startswith('<') and query_stripped.endswith('>'):
             outer_wrapper_match = re.match(r'^\s*<(\w+)[^>]*>\s*\{(.*)\}\s*</(\w+)>\s*$', query_stripped, re.DOTALL)
             if outer_wrapper_match and outer_wrapper_match.group(1) == outer_wrapper_match.group(3):
                 query = outer_wrapper_match.group(2)
+                query_stripped = query.strip()
+            else:
+                break
         
         # Step 8: Process FLWOR expressions
         query = XMLUtilities._process_flwor(query)
@@ -771,14 +775,24 @@ class XMLUtilities:
         query_no_comments = re.sub(r'xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;', '', query_no_comments, flags=re.IGNORECASE)
         query_no_comments = query_no_comments.strip()
         
+        # Extract nested element structure by parsing the element hierarchy
+        nested_elements = []
+        
         # Check for outer wrapper like <Result>{...}</Result>
-        outer_match = re.match(r'^\s*<(\w+)[^>]*>\s*\{.*\}\s*</(\w+)>\s*$', query_no_comments, re.DOTALL)
-        if outer_match and outer_match.group(1) == outer_match.group(2):
+        outer_match = re.match(r'^\s*<(\w+)[^>]*>\s*\{(.*)\}\s*</(\w+)>\s*$', query_no_comments, re.DOTALL)
+        if outer_match and outer_match.group(1) == outer_match.group(3):
             root_element = outer_match.group(1)
+            inner_content = outer_match.group(2)
+            
+            # Check for nested wrapper elements (e.g., <Inner>{...}</Inner>)
+            nested_match = re.match(r'^\s*<(\w+)[^>]*>\s*\{(.*)\}\s*</(\1)>\s*$', inner_content.strip(), re.DOTALL)
+            if nested_match:
+                nested_elements.append(nested_match.group(1))
+                inner_content = nested_match.group(2)
         
         # Extract element names and structure from return statements
         child_elements = []
-        structure_info = {'pattern': 'unknown', 'parts': []}
+        structure_info = {'pattern': 'unknown', 'parts': [], 'nested_elements': nested_elements}
         
         # Check for comma-separated FLWOR pattern: for...return..., let...return
         comma_flwor = r'for\s+\$\w+\s+in\s+[^\r\n]+\s+return\s+<(\w+)[^>]*>\s*\{[^}]*\}\s*</\1>\s*,\s*let\s+\$\w+\s*:=\s*[^\r\n]+\s+return\s+<(\w+)[^>]*>\s*\{[^}]*\}\s*</\2>'
@@ -794,7 +808,8 @@ class XMLUtilities:
                 'parts': [
                     {'element': first_element, 'type': 'sequence', 'description': 'for...return (multiple items)'},
                     {'element': second_element, 'type': 'singleton', 'description': 'let...return (single item)'}
-                ]
+                ],
+                'nested_elements': nested_elements
             }
         else:
             # General pattern: extract all return statements with element construction
@@ -836,7 +851,8 @@ class XMLUtilities:
                 metadata = {
                     'root_element': root_element,
                     'child_elements': child_elements,
-                    'structure_info': structure_info
+                    'structure_info': structure_info,
+                    'original_query': xquery_string  # Store original for interpolation
                 }
             
             # Preprocess XQuery to handle unsupported syntax

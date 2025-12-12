@@ -3,6 +3,7 @@ XQuery panel for executing XQuery expressions with file-based editor.
 """
 
 import os
+import re
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QTextEdit, QFileDialog, QMessageBox,
                               QSplitter, QFrame, QLineEdit, QListWidget, QListWidgetItem,
@@ -418,16 +419,151 @@ class XQueryPanel(QWidget):
             item.setForeground(QColor(theme.get_color('text')))
             self.result_list.addItem(item)
     
+    def _interpolate_xquery_results(self, original_query, results):
+        """
+        Interpolate XQuery results back into the original query template.
+        
+        This approach preserves the exact XML structure from the original query
+        by replacing FLWOR expressions with actual result elements.
+        
+        Args:
+            original_query: Original XQuery with element construction
+            results: List of result values from query execution
+            
+        Returns:
+            XML string with interpolated results, or None if interpolation fails
+        """
+        from lxml import etree
+        
+        # Clean up the query - remove comments and declarations
+        query = original_query
+        query = re.sub(r'\(:.*?:\)', '', query, flags=re.DOTALL)
+        query = re.sub(r'xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;', '', query, flags=re.IGNORECASE)
+        query = query.strip()
+        
+        # Find the outermost {...} block and expand it
+        # Match outermost element wrapper: <Element>{...}</Element>
+        wrapper_match = re.match(r'^<(\w+)[^>]*>\s*\{(.*)\}\s*</(\w+)>$', query, re.DOTALL)
+        
+        if not wrapper_match:
+            return None
+        
+        root_elem = wrapper_match.group(1)
+        content = wrapper_match.group(2)
+        
+        # Check for nested element wrapper
+        nested_wrapper_match = re.match(r'^\s*<(\w+)[^>]*>\s*\{(.*)\}\s*</(\w+)>\s*$', content.strip(), re.DOTALL)
+        
+        if nested_wrapper_match:
+            nested_elem = nested_wrapper_match.group(1)
+            content = nested_wrapper_match.group(2)
+        else:
+            nested_elem = None
+        
+        # Now process the FLWOR content
+        result_index = [0]
+        output_parts = []
+        
+        # Check for comma-separated FLWOR pattern
+        comma_pattern = r'for\s+\$\w+\s+in\s+[^\r\n]+\s+return\s+(<\w+[^>]*>)\s*\{[^}]*\}\s*</\w+>\s*,\s*let\s+\$\w+\s*:=\s*[^\r\n]+\s+return\s+(<\w+[^>]*>)\s*\{[^}]*\}\s*</\w+>'
+        comma_match = re.search(comma_pattern, content, re.DOTALL | re.IGNORECASE)
+        
+        if comma_match:
+            # Extract element names from opening tags
+            first_open_tag = comma_match.group(1)
+            second_open_tag = comma_match.group(2)
+            
+            # Extract element names
+            first_elem_name = re.search(r'<(\w+)', first_open_tag).group(1)
+            second_elem_name = re.search(r'<(\w+)', second_open_tag).group(1)
+            
+            # Build elements with results
+            for i in range(len(results)):
+                if result_index[0] < len(results):
+                    value = str(results[result_index[0]]).strip()
+                    result_index[0] += 1
+                    
+                    # Choose element based on position (all but last get first, last gets second)
+                    if i < len(results) - 1:
+                        elem_name = first_elem_name
+                    else:
+                        elem_name = second_elem_name
+                    
+                    output_parts.append(f'  <{elem_name}>{value}</{elem_name}>')
+        else:
+            # Simple FLWOR: for...return
+            return_pattern = r'return\s+<(\w+)[^>]*>\s*\{[^}]*\}\s*</\w+>'
+            return_match = re.search(return_pattern, content, re.DOTALL | re.IGNORECASE)
+            
+            if return_match:
+                elem_name = return_match.group(1)
+                
+                for i in range(len(results)):
+                    if result_index[0] < len(results):
+                        value = str(results[result_index[0]]).strip()
+                        result_index[0] += 1
+                        output_parts.append(f'  <{elem_name}>{value}</{elem_name}>')
+        
+        if not output_parts:
+            return None
+        
+        # Build final XML
+        xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>']
+        xml_parts.append(f'<{root_elem}>')
+        
+        if nested_elem:
+            xml_parts.append(f'  <{nested_elem}>')
+            # Indent nested content more
+            output_parts = ['  ' + part for part in output_parts]
+            xml_parts.extend(output_parts)
+            xml_parts.append(f'  </{nested_elem}>')
+        else:
+            xml_parts.extend(output_parts)
+        
+        xml_parts.append(f'</{root_elem}>')
+        
+        output = '\n'.join(xml_parts)
+        
+        # Try to parse it to ensure it's valid XML
+        try:
+            etree.fromstring(output.encode('utf-8'))
+            return output
+        except Exception as e:
+            # If parsing fails, return None to fall back to reconstruction
+            return None
+    
     def show_xml_result(self, results, metadata, theme):
         """Display results as an XML document."""
         from lxml import etree
+        import re
         
         self.result_stack.setCurrentIndex(1)
         
-        # Build XML document from results
+        # Get original query for interpolation
+        original_query = metadata.get('original_query', '')
+        
+        # Try string interpolation approach if we have the original query
+        if original_query:
+            try:
+                xml_output = self._interpolate_xquery_results(original_query, results)
+                if xml_output:
+                    self.result_xml.setPlainText(xml_output)
+                    self.result_xml.setStyleSheet(f"""
+                        QTextEdit {{
+                            background-color: {theme.get_color('base')};
+                            color: {theme.get_color('text')};
+                        }}
+                    """)
+                    return
+            except Exception as e:
+                # Fall back to reconstruction if interpolation fails
+                pass
+        
+        # Fall back to reconstruction approach
         root_element = metadata.get('root_element')
         child_elements = metadata.get('child_elements') or []
         structure_info = metadata.get('structure_info') or {}
+        nested_elements = structure_info.get('nested_elements', [])
         
         # Create root element
         if root_element:
@@ -435,7 +571,13 @@ class XQueryPanel(QWidget):
         else:
             root = etree.Element("Result")
         
-        # Add results as child elements
+        # Handle nested element structure
+        parent = root
+        for nested_elem in nested_elements:
+            nested_container = etree.SubElement(parent, nested_elem)
+            parent = nested_container
+        
+        # Add results as child elements under the appropriate parent
         if child_elements:
             # Use structure info to properly map results to elements
             pattern = structure_info.get('pattern')
@@ -455,20 +597,20 @@ class XQueryPanel(QWidget):
                         # Last item is the singleton (let...return)
                         child_element_name = singleton_element
                     
-                    child = etree.SubElement(root, child_element_name)
+                    child = etree.SubElement(parent, child_element_name)
                     result_str = str(result).strip()
                     child.text = result_str
             else:
                 # Unknown pattern or single element type - use first element name for all
                 child_element_name = child_elements[0] if child_elements else "Item"
                 for result in results:
-                    child = etree.SubElement(root, child_element_name)
+                    child = etree.SubElement(parent, child_element_name)
                     result_str = str(result).strip()
                     child.text = result_str
         else:
             # No specific child elements, wrap each result
             for result in results:
-                child = etree.SubElement(root, "Item")
+                child = etree.SubElement(parent, "Item")
                 result_str = str(result).strip()
                 child.text = result_str
         
