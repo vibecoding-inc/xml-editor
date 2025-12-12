@@ -1,0 +1,1451 @@
+<staffinfo >
+  <job id='AD_PRES'>
+    <title>President</title>
+    <minsalary>20000</minsalary>
+    <maxsalary>40000</maxsalary>
+  </job>
+  <job id='AD_VP'>
+    <title>Administration Vice President</title>
+    <minsalary>15000</minsalary>
+    <maxsalary>30000</maxsalary>
+  </job>
+  <job id='AD_ASST'>
+    <title>Administration Assistant</title>
+    <minsalary>3000</minsalary>
+    <maxsalary>6000</maxsalary>
+  </job>
+  <job id='FI_MGR'>
+    <title>Finance Manager</title>
+    <minsalary>8200</minsalary>
+    <maxsalary>16000</maxsalary>
+  </job>
+  <job id='FI_ACCOUNT'>
+    <title>Accountant</title>
+    <minsalary>4200</minsalary>
+    <maxsalary>9000</maxsalary>
+  </job>
+  <job id='AC_MGR'>
+    <title>Accounting Manager</title>
+    <minsalary>8200</minsalary>
+    <maxsalary>16000</maxsalary>
+  </job>
+  <job id='AC_ACCOUNT'>
+    <title>Public Accountant</title>
+    <minsalary>4200</minsalary>
+    <maxsalary>9000</maxsalary>
+  </job>
+  <job id='SA_MAN'>
+    <title>Sales Manager</title>
+    <minsalary>10000</minsalary>
+    <maxsalary>20000</maxsalary>
+  </job>
+  <job id='SA_REP'>
+    <title>Sales Representative</title>
+    <minsalary>6000</minsalary>
+    <maxsalary>12000</maxsalary>
+  </job>
+  <job id='PU_MAN'>
+    <title>Purchasing Manager</title>
+    <minsalary>8000</minsalary>
+    <maxsalary>15000</maxsalary>
+  </job>
+  <job id='PU_CLERK'>
+    <title>Purchasing Clerk</title>
+    <minsalary>2500</minsalary>
+    <maxsalary>5500</maxsalary>
+  </job>
+  <job id='ST_MAN'>
+    <title>Stock Manager</title>
+    <minsalary>5500</minsalary>
+    <maxsalary>8500</maxsalary>
+  </job>
+  <job id='ST_CLERK'>
+    <title>Stock Clerk</title>
+    <minsalary>2000</minsalary>
+    <maxsalary>5000</maxsalary>
+  </job>
+  <job id='SH_CLERK'>
+    <title>Shipping Clerk</title>
+    <minsalary>2500</minsalary>
+    <maxsalary>5500</maxsalary>
+  </job>
+  <job id='IT_PROG'>
+    <title>Programmer</title>
+    <minsalary>4000</minsalary>
+    <maxsalary>10000</maxsalary>
+  </job>
+  <job id='MK_MAN'>
+    <title>Marketing Manager</title>
+    <minsalary>9000</minsalary>
+    <maxsalary>15000</maxsalary>
+  </job>
+  <job id='MK_REP'>
+    <title>Marketing Representative</title>
+    <minsalary>4000</minsalary>
+    <maxsalary>9000</maxsalary>
+  </job>
+  <job id='HR_REP'>
+    <title>Human Resources Representative</title>
+    <minsalary>4000</minsalary>
+    <maxsalary>9000</maxsalary>
+  </job>
+  <job id='PR_REP'>
+    <title>Public Relations Representative</title>
+    <minsalary>4500</minsalary>
+    <maxsalary>10500</maxsalary>
+  </job>
+  <region id='1' name='Europe'>
+    <country id='BE'>
+      <name>Belgium</name>
+    </country>
+    <country id='CH'>
+      <name>Switzerland</name>
+      <location id='2900'>
+        <streetaddress>20 Rue des Corps-Saints</streetaddress>
+        <postalcode>1730</postalcode>
+        <city>Geneva</city>
+        <stateprovince>Geneve</stateprovince>
+      </location>
+      <location id='3000'>
+        <streetaddress>Murtenstrasse 921</streetaddress>
+        <postalcode>3095</postalcode>
+        <city>Bern</city>
+        <stateprovince>BE</stateprovince>
+      </location>
+    </country>
+    <country id='DE'>
+      <name>Germany</name>
+      <location id='2700'>
+        <streetaddress>Schwanthalerstr. 7031</streetaddress>
+        <postalcode>80925</postalcode>
+        <city>Munich</city>
+        <stateprovince>Bavaria</stateprovince>
+        <department manager='204' id='70'>
+          <name>Public Relations</name>
+          <employee id='204'>
+            <firstname>Hermann</firstname>
+            <lastname>Baer</lastname>
+            <email>HBAER</email>
+            <phone>515.123.8888</phone>
+            <hiredate>1994-06-07</hiredate>
+            <jobid>PR_REP</jobid>
+            <salary>10000</salary>
+            <manager>101</manager>
+          </employee>
+        </department>
+      </location>
+    </country>
+    <country id='DK'>
+      <name>Denmark</name>
+    </country>
+    <country id='FR'>
+      <name>France</name>
+    </country>
+    <country id='IT'>
+      <name>Italy</name>
+      <location id='1000'>
+        <streetaddress>1297 Via Cola di Rie</streetaddress>
+        <postalcode>00989</postalcode>
+        <city>Roma</city>
+      </location>
+      <location id='1100'>
+        <streetaddress>93091 Calle della Testa</streetaddress>
+        <postalcode>10934</postalcode>
+        <city>Venice</city>
+      </location>
+    </country>
+    <country id='NL'>
+      <name>Netherlands</name>
+      <location id='3100'>
+        <streetaddress>Pieter Breughelstraat 837</streetaddress>
+        <postalcode>3029SK</postalcode>
+        <city>Utrecht</city>
+        <stateprovince>Utrecht</stateprovince>
+      </location>
+    </country>
+    <country id='UK'>
+      <name>United Kingdom</name>
+      <location id='2400'>
+        <streetaddress>8204 Arthur St</streetaddress>
+        <city>London</city>
+        <department manager='203' id='40'>
+          <name>Human Resources</name>
+          <employee id='203'>
+            <firstname>Susan</firstname>
+            <lastname>Mavris</lastname>
+            <email>SMAVRIS</email>
+            <phone>515.123.7777</phone>
+            <hiredate>1994-06-07</hiredate>
+            <jobid>HR_REP</jobid>
+            <salary>6500</salary>
+            <manager>101</manager>
+          </employee>
+        </department>
+      </location>
+      <location id='2500'>
+        <streetaddress>Magdalen Centre, The Oxford Science Park</streetaddress>
+        <postalcode>OX9 9ZB</postalcode>
+        <city>Oxford</city>
+        <stateprovince>Oxford</stateprovince>
+        <department manager='145' id='80'>
+          <name>Sales</name>
+          <employee id='145'>
+            <firstname>John</firstname>
+            <lastname>Russell</lastname>
+            <email>JRUSSEL</email>
+            <phone>011.44.1344.429268</phone>
+            <hiredate>1996-10-01</hiredate>
+            <jobid>SA_MAN</jobid>
+            <salary>14000</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='146'>
+            <firstname>Karen</firstname>
+            <lastname>Partners</lastname>
+            <email>KPARTNER</email>
+            <phone>011.44.1344.467268</phone>
+            <hiredate>1997-01-05</hiredate>
+            <jobid>SA_MAN</jobid>
+            <salary>13500</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='147'>
+            <firstname>Alberto</firstname>
+            <lastname>Errazuriz</lastname>
+            <email>AERRAZUR</email>
+            <phone>011.44.1344.429278</phone>
+            <hiredate>1997-03-10</hiredate>
+            <jobid>SA_MAN</jobid>
+            <salary>12000</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='148'>
+            <firstname>Gerald</firstname>
+            <lastname>Cambrault</lastname>
+            <email>GCAMBRAU</email>
+            <phone>011.44.1344.619268</phone>
+            <hiredate>1999-10-15</hiredate>
+            <jobid>SA_MAN</jobid>
+            <salary>11000</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='149'>
+            <firstname>Eleni</firstname>
+            <lastname>Zlotkey</lastname>
+            <email>EZLOTKEY</email>
+            <phone>011.44.1344.429018</phone>
+            <hiredate>2000-01-29</hiredate>
+            <jobid>SA_MAN</jobid>
+            <salary>10500</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='150'>
+            <firstname>Peter</firstname>
+            <lastname>Tucker</lastname>
+            <email>PTUCKER</email>
+            <phone>011.44.1344.129268</phone>
+            <hiredate>1997-01-30</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>10000</salary>
+            <manager>145</manager>
+          </employee>
+          <employee id='151'>
+            <firstname>David</firstname>
+            <lastname>Bernstein</lastname>
+            <email>DBERNSTE</email>
+            <phone>011.44.1344.345268</phone>
+            <hiredate>1997-03-24</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>9500</salary>
+            <manager>145</manager>
+          </employee>
+          <employee id='152'>
+            <firstname>Peter</firstname>
+            <lastname>Hall</lastname>
+            <email>PHALL</email>
+            <phone>011.44.1344.478968</phone>
+            <hiredate>1997-08-20</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>9000</salary>
+            <manager>145</manager>
+          </employee>
+          <employee id='153'>
+            <firstname>Christopher</firstname>
+            <lastname>Olsen</lastname>
+            <email>COLSEN</email>
+            <phone>011.44.1344.498718</phone>
+            <hiredate>1998-03-30</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>8000</salary>
+            <manager>145</manager>
+          </employee>
+          <employee id='154'>
+            <firstname>Nanette</firstname>
+            <lastname>Cambrault</lastname>
+            <email>NCAMBRAU</email>
+            <phone>011.44.1344.987668</phone>
+            <hiredate>1998-12-09</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>7500</salary>
+            <manager>145</manager>
+          </employee>
+          <employee id='155'>
+            <firstname>Oliver</firstname>
+            <lastname>Tuvault</lastname>
+            <email>OTUVAULT</email>
+            <phone>011.44.1344.486508</phone>
+            <hiredate>1999-11-23</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>7000</salary>
+            <manager>145</manager>
+          </employee>
+          <employee id='156'>
+            <firstname>Janette</firstname>
+            <lastname>King</lastname>
+            <email>JKING</email>
+            <phone>011.44.1345.429268</phone>
+            <hiredate>1996-01-30</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>10000</salary>
+            <manager>146</manager>
+          </employee>
+          <employee id='157'>
+            <firstname>Patrick</firstname>
+            <lastname>Sully</lastname>
+            <email>PSULLY</email>
+            <phone>011.44.1345.929268</phone>
+            <hiredate>1996-03-04</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>9500</salary>
+            <manager>146</manager>
+          </employee>
+          <employee id='158'>
+            <firstname>Allan</firstname>
+            <lastname>McEwen</lastname>
+            <email>AMCEWEN</email>
+            <phone>011.44.1345.829268</phone>
+            <hiredate>1996-08-01</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>9000</salary>
+            <manager>146</manager>
+          </employee>
+          <employee id='159'>
+            <firstname>Lindsey</firstname>
+            <lastname>Smith</lastname>
+            <email>LSMITH</email>
+            <phone>011.44.1345.729268</phone>
+            <hiredate>1997-03-10</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>8000</salary>
+            <manager>146</manager>
+          </employee>
+          <employee id='160'>
+            <firstname>Louise</firstname>
+            <lastname>Doran</lastname>
+            <email>LDORAN</email>
+            <phone>011.44.1345.629268</phone>
+            <hiredate>1997-12-15</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>7500</salary>
+            <manager>146</manager>
+          </employee>
+          <employee id='161'>
+            <firstname>Sarath</firstname>
+            <lastname>Sewall</lastname>
+            <email>SSEWALL</email>
+            <phone>011.44.1345.529268</phone>
+            <hiredate>1998-11-03</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>7000</salary>
+            <manager>146</manager>
+          </employee>
+          <employee id='162'>
+            <firstname>Clara</firstname>
+            <lastname>Vishney</lastname>
+            <email>CVISHNEY</email>
+            <phone>011.44.1346.129268</phone>
+            <hiredate>1997-11-11</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>10500</salary>
+            <manager>147</manager>
+          </employee>
+          <employee id='163'>
+            <firstname>Danielle</firstname>
+            <lastname>Greene</lastname>
+            <email>DGREENE</email>
+            <phone>011.44.1346.229268</phone>
+            <hiredate>1999-03-19</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>9500</salary>
+            <manager>147</manager>
+          </employee>
+          <employee id='164'>
+            <firstname>Mattea</firstname>
+            <lastname>Marvins</lastname>
+            <email>MMARVINS</email>
+            <phone>011.44.1346.329268</phone>
+            <hiredate>2000-01-24</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>7200</salary>
+            <manager>147</manager>
+          </employee>
+          <employee id='165'>
+            <firstname>David</firstname>
+            <lastname>Lee</lastname>
+            <email>DLEE</email>
+            <phone>011.44.1346.529268</phone>
+            <hiredate>2000-02-23</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>6800</salary>
+            <manager>147</manager>
+          </employee>
+          <employee id='166'>
+            <firstname>Sundar</firstname>
+            <lastname>Ande</lastname>
+            <email>SANDE</email>
+            <phone>011.44.1346.629268</phone>
+            <hiredate>2000-03-24</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>6400</salary>
+            <manager>147</manager>
+          </employee>
+          <employee id='167'>
+            <firstname>Amit</firstname>
+            <lastname>Banda</lastname>
+            <email>ABANDA</email>
+            <phone>011.44.1346.729268</phone>
+            <hiredate>2000-04-21</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>6200</salary>
+            <manager>147</manager>
+          </employee>
+          <employee id='168'>
+            <firstname>Lisa</firstname>
+            <lastname>Ozer</lastname>
+            <email>LOZER</email>
+            <phone>011.44.1343.929268</phone>
+            <hiredate>1997-03-11</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>11500</salary>
+            <manager>148</manager>
+          </employee>
+          <employee id='169'>
+            <firstname>Harrison</firstname>
+            <lastname>Bloom</lastname>
+            <email>HBLOOM</email>
+            <phone>011.44.1343.829268</phone>
+            <hiredate>1998-03-23</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>10000</salary>
+            <manager>148</manager>
+          </employee>
+          <employee id='170'>
+            <firstname>Tayler</firstname>
+            <lastname>Fox</lastname>
+            <email>TFOX</email>
+            <phone>011.44.1343.729268</phone>
+            <hiredate>1998-01-24</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>9600</salary>
+            <manager>148</manager>
+          </employee>
+          <employee id='171'>
+            <firstname>William</firstname>
+            <lastname>Smith</lastname>
+            <email>WSMITH</email>
+            <phone>011.44.1343.629268</phone>
+            <hiredate>1999-02-23</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>7400</salary>
+            <manager>148</manager>
+          </employee>
+          <employee id='172'>
+            <firstname>Elizabeth</firstname>
+            <lastname>Bates</lastname>
+            <email>EBATES</email>
+            <phone>011.44.1343.529268</phone>
+            <hiredate>1999-03-24</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>7300</salary>
+            <manager>148</manager>
+          </employee>
+          <employee id='173'>
+            <firstname>Sundita</firstname>
+            <lastname>Kumar</lastname>
+            <email>SKUMAR</email>
+            <phone>011.44.1343.329268</phone>
+            <hiredate>2000-04-21</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>6100</salary>
+            <manager>148</manager>
+          </employee>
+          <employee id='174'>
+            <firstname>Ellen</firstname>
+            <lastname>Abel</lastname>
+            <email>EABEL</email>
+            <phone>011.44.1644.429267</phone>
+            <hiredate>1996-05-11</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>11000</salary>
+            <manager>149</manager>
+          </employee>
+          <employee id='175'>
+            <firstname>Alyssa</firstname>
+            <lastname>Hutton</lastname>
+            <email>AHUTTON</email>
+            <phone>011.44.1644.429266</phone>
+            <hiredate>1997-03-19</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>8800</salary>
+            <manager>149</manager>
+          </employee>
+          <employee id='176'>
+            <firstname>Jonathon</firstname>
+            <lastname>Taylor</lastname>
+            <email>JTAYLOR</email>
+            <phone>011.44.1644.429265</phone>
+            <hiredate>1998-03-24</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>8600</salary>
+            <manager>149</manager>
+          </employee>
+          <employee id='177'>
+            <firstname>Jack</firstname>
+            <lastname>Livingston</lastname>
+            <email>JLIVINGS</email>
+            <phone>011.44.1644.429264</phone>
+            <hiredate>1998-04-23</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>8400</salary>
+            <manager>149</manager>
+          </employee>
+          <employee id='179'>
+            <firstname>Charles</firstname>
+            <lastname>Johnson</lastname>
+            <email>CJOHNSON</email>
+            <phone>011.44.1644.429262</phone>
+            <hiredate>2000-01-04</hiredate>
+            <jobid>SA_REP</jobid>
+            <salary>6200</salary>
+            <manager>149</manager>
+          </employee>
+        </department>
+      </location>
+      <location id='2600'>
+        <streetaddress>9702 Chester Road</streetaddress>
+        <postalcode>09629850293</postalcode>
+        <city>Stretford</city>
+        <stateprovince>Manchester</stateprovince>
+      </location>
+    </country>
+  </region>
+  <region id='2' name='America'>
+    <country id='AR'>
+      <name>Argentina</name>
+    </country>
+    <country id='BR'>
+      <name>Brazil</name>
+      <location id='2800'>
+        <streetaddress>Rua Frei Caneca 1360 </streetaddress>
+        <postalcode>01307-002</postalcode>
+        <city>Sao Paulo</city>
+        <stateprovince>Sao Paulo</stateprovince>
+      </location>
+    </country>
+    <country id='CA'>
+      <name>Canada</name>
+      <location id='1800'>
+        <streetaddress>147 Spadina Ave</streetaddress>
+        <postalcode>M5V 2L7</postalcode>
+        <city>Toronto</city>
+        <stateprovince>Ontario</stateprovince>
+        <department manager='201' id='20'>
+          <name>Marketing</name>
+          <employee id='201'>
+            <firstname>Michael</firstname>
+            <lastname>Hartstein</lastname>
+            <email>MHARTSTE</email>
+            <phone>515.123.5555</phone>
+            <hiredate>1996-02-17</hiredate>
+            <jobid>MK_MAN</jobid>
+            <salary>13000</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='202'>
+            <firstname>Pat</firstname>
+            <lastname>Fay</lastname>
+            <email>PFAY</email>
+            <phone>603.123.6666</phone>
+            <hiredate>1997-08-17</hiredate>
+            <jobid>MK_REP</jobid>
+            <salary>6000</salary>
+            <manager>201</manager>
+          </employee>
+        </department>
+      </location>
+      <location id='1900'>
+        <streetaddress>6092 Boxwood St</streetaddress>
+        <postalcode>YSW 9T2</postalcode>
+        <city>Whitehorse</city>
+        <stateprovince>Yukon</stateprovince>
+      </location>
+    </country>
+    <country id='MX'>
+      <name>Mexico</name>
+      <location id='3200'>
+        <streetaddress>Mariano Escobedo 9991</streetaddress>
+        <postalcode>11932</postalcode>
+        <city>Mexico City</city>
+        <stateprovince>Distrito Federal,</stateprovince>
+      </location>
+    </country>
+    <country id='US'>
+      <name>United States of America</name>
+      <location id='1400'>
+        <streetaddress>2014 Jabberwocky Rd</streetaddress>
+        <postalcode>26192</postalcode>
+        <city>Southlake</city>
+        <stateprovince>Texas</stateprovince>
+        <department manager='103' id='60'>
+          <name>IT</name>
+          <employee id='103'>
+            <firstname>Alexander</firstname>
+            <lastname>Hunold</lastname>
+            <email>AHUNOLD</email>
+            <phone>590.423.4567</phone>
+            <hiredate>1990-01-03</hiredate>
+            <jobid>IT_PROG</jobid>
+            <salary>9000</salary>
+            <manager>102</manager>
+          </employee>
+          <employee id='104'>
+            <firstname>Bruce</firstname>
+            <lastname>Ernst</lastname>
+            <email>BERNST</email>
+            <phone>590.423.4568</phone>
+            <hiredate>1991-05-21</hiredate>
+            <jobid>IT_PROG</jobid>
+            <salary>6000</salary>
+            <manager>103</manager>
+          </employee>
+          <employee id='105'>
+            <firstname>David</firstname>
+            <lastname>Austin</lastname>
+            <email>DAUSTIN</email>
+            <phone>590.423.4569</phone>
+            <hiredate>1997-06-25</hiredate>
+            <jobid>IT_PROG</jobid>
+            <salary>4800</salary>
+            <manager>103</manager>
+          </employee>
+          <employee id='106'>
+            <firstname>Valli</firstname>
+            <lastname>Pataballa</lastname>
+            <email>VPATABAL</email>
+            <phone>590.423.4560</phone>
+            <hiredate>1998-02-05</hiredate>
+            <jobid>IT_PROG</jobid>
+            <salary>4800</salary>
+            <manager>103</manager>
+          </employee>
+          <employee id='107'>
+            <firstname>Diana</firstname>
+            <lastname>Lorentz</lastname>
+            <email>DLORENTZ</email>
+            <phone>590.423.5567</phone>
+            <hiredate>1999-02-07</hiredate>
+            <jobid>IT_PROG</jobid>
+            <salary>4200</salary>
+            <manager>103</manager>
+          </employee>
+        </department>
+      </location>
+      <location id='1500'>
+        <streetaddress>2011 Interiors Blvd</streetaddress>
+        <postalcode>99236</postalcode>
+        <city>South San Francisco</city>
+        <stateprovince>California</stateprovince>
+        <department manager='121' id='50'>
+          <name>Shipping</name>
+          <employee id='120'>
+            <firstname>Matthew</firstname>
+            <lastname>Weiss</lastname>
+            <email>MWEISS</email>
+            <phone>650.123.1234</phone>
+            <hiredate>1996-07-18</hiredate>
+            <jobid>ST_MAN</jobid>
+            <salary>8000</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='121'>
+            <firstname>Adam</firstname>
+            <lastname>Fripp</lastname>
+            <email>AFRIPP</email>
+            <phone>650.123.2234</phone>
+            <hiredate>1997-04-10</hiredate>
+            <jobid>ST_MAN</jobid>
+            <salary>8200</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='122'>
+            <firstname>Payam</firstname>
+            <lastname>Kaufling</lastname>
+            <email>PKAUFLIN</email>
+            <phone>650.123.3234</phone>
+            <hiredate>1995-05-01</hiredate>
+            <jobid>ST_MAN</jobid>
+            <salary>7900</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='123'>
+            <firstname>Shanta</firstname>
+            <lastname>Vollman</lastname>
+            <email>SVOLLMAN</email>
+            <phone>650.123.4234</phone>
+            <hiredate>1997-10-10</hiredate>
+            <jobid>ST_MAN</jobid>
+            <salary>6500</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='124'>
+            <firstname>Kevin</firstname>
+            <lastname>Mourgos</lastname>
+            <email>KMOURGOS</email>
+            <phone>650.123.5234</phone>
+            <hiredate>1999-11-16</hiredate>
+            <jobid>ST_MAN</jobid>
+            <salary>5800</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='125'>
+            <firstname>Julia</firstname>
+            <lastname>Nayer</lastname>
+            <email>JNAYER</email>
+            <phone>650.124.1214</phone>
+            <hiredate>1997-07-16</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>3200</salary>
+            <manager>120</manager>
+          </employee>
+          <employee id='126'>
+            <firstname>Irene</firstname>
+            <lastname>Mikkilineni</lastname>
+            <email>IMIKKILI</email>
+            <phone>650.124.1224</phone>
+            <hiredate>1998-09-28</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2700</salary>
+            <manager>120</manager>
+          </employee>
+          <employee id='127'>
+            <firstname>James</firstname>
+            <lastname>Landry</lastname>
+            <email>JLANDRY</email>
+            <phone>650.124.1334</phone>
+            <hiredate>1999-01-14</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2400</salary>
+            <manager>120</manager>
+          </employee>
+          <employee id='128'>
+            <firstname>Steven</firstname>
+            <lastname>Markle</lastname>
+            <email>SMARKLE</email>
+            <phone>650.124.1434</phone>
+            <hiredate>2000-03-08</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2200</salary>
+            <manager>120</manager>
+          </employee>
+          <employee id='129'>
+            <firstname>Laura</firstname>
+            <lastname>Bissot</lastname>
+            <email>LBISSOT</email>
+            <phone>650.124.5234</phone>
+            <hiredate>1997-08-20</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>3300</salary>
+            <manager>121</manager>
+          </employee>
+          <employee id='130'>
+            <firstname>Mozhe</firstname>
+            <lastname>Atkinson</lastname>
+            <email>MATKINSO</email>
+            <phone>650.124.6234</phone>
+            <hiredate>1997-10-30</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2800</salary>
+            <manager>121</manager>
+          </employee>
+          <employee id='131'>
+            <firstname>James</firstname>
+            <lastname>Marlow</lastname>
+            <email>JAMRLOW</email>
+            <phone>650.124.7234</phone>
+            <hiredate>1997-02-16</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2500</salary>
+            <manager>121</manager>
+          </employee>
+          <employee id='132'>
+            <firstname>TJ</firstname>
+            <lastname>Olson</lastname>
+            <email>TJOLSON</email>
+            <phone>650.124.8234</phone>
+            <hiredate>1999-04-10</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2100</salary>
+            <manager>121</manager>
+          </employee>
+          <employee id='133'>
+            <firstname>Jason</firstname>
+            <lastname>Mallin</lastname>
+            <email>JMALLIN</email>
+            <phone>650.127.1934</phone>
+            <hiredate>1996-06-14</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>3300</salary>
+            <manager>122</manager>
+          </employee>
+          <employee id='134'>
+            <firstname>Michael</firstname>
+            <lastname>Rogers</lastname>
+            <email>MROGERS</email>
+            <phone>650.127.1834</phone>
+            <hiredate>1998-08-26</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2900</salary>
+            <manager>122</manager>
+          </employee>
+          <employee id='135'>
+            <firstname>Ki</firstname>
+            <lastname>Gee</lastname>
+            <email>KGEE</email>
+            <phone>650.127.1734</phone>
+            <hiredate>1999-12-12</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2400</salary>
+            <manager>122</manager>
+          </employee>
+          <employee id='136'>
+            <firstname>Hazel</firstname>
+            <lastname>Philtanker</lastname>
+            <email>HPHILTAN</email>
+            <phone>650.127.1634</phone>
+            <hiredate>2000-02-06</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2200</salary>
+            <manager>122</manager>
+          </employee>
+          <employee id='137'>
+            <firstname>Renske</firstname>
+            <lastname>Ladwig</lastname>
+            <email>RLADWIG</email>
+            <phone>650.121.1234</phone>
+            <hiredate>1995-07-14</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>3600</salary>
+            <manager>123</manager>
+          </employee>
+          <employee id='138'>
+            <firstname>Stephen</firstname>
+            <lastname>Stiles</lastname>
+            <email>SSTILES</email>
+            <phone>650.121.2034</phone>
+            <hiredate>1997-10-26</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>3200</salary>
+            <manager>123</manager>
+          </employee>
+          <employee id='139'>
+            <firstname>John</firstname>
+            <lastname>Seo</lastname>
+            <email>JSEO</email>
+            <phone>650.121.2019</phone>
+            <hiredate>1998-02-12</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2700</salary>
+            <manager>123</manager>
+          </employee>
+          <employee id='140'>
+            <firstname>Joshua</firstname>
+            <lastname>Patel</lastname>
+            <email>JPATEL</email>
+            <phone>650.121.1834</phone>
+            <hiredate>1998-04-06</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2500</salary>
+            <manager>123</manager>
+          </employee>
+          <employee id='141'>
+            <firstname>Trenna</firstname>
+            <lastname>Rajs</lastname>
+            <email>TRAJS</email>
+            <phone>650.121.8009</phone>
+            <hiredate>1995-10-17</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>3500</salary>
+            <manager>124</manager>
+          </employee>
+          <employee id='142'>
+            <firstname>Curtis</firstname>
+            <lastname>Davies</lastname>
+            <email>CDAVIES</email>
+            <phone>650.121.2994</phone>
+            <hiredate>1997-01-29</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>3100</salary>
+            <manager>124</manager>
+          </employee>
+          <employee id='143'>
+            <firstname>Randall</firstname>
+            <lastname>Matos</lastname>
+            <email>RMATOS</email>
+            <phone>650.121.2874</phone>
+            <hiredate>1998-03-15</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2600</salary>
+            <manager>124</manager>
+          </employee>
+          <employee id='144'>
+            <firstname>Peter</firstname>
+            <lastname>Vargas</lastname>
+            <email>PVARGAS</email>
+            <phone>650.121.2004</phone>
+            <hiredate>1998-07-09</hiredate>
+            <jobid>ST_CLERK</jobid>
+            <salary>2500</salary>
+            <manager>124</manager>
+          </employee>
+          <employee id='180'>
+            <firstname>Winston</firstname>
+            <lastname>Taylor</lastname>
+            <email>WTAYLOR</email>
+            <phone>650.507.9876</phone>
+            <hiredate>1998-01-24</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3200</salary>
+            <manager>120</manager>
+          </employee>
+          <employee id='181'>
+            <firstname>Jean</firstname>
+            <lastname>Fleaur</lastname>
+            <email>JFLEAUR</email>
+            <phone>650.507.9877</phone>
+            <hiredate>1998-02-23</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3100</salary>
+            <manager>120</manager>
+          </employee>
+          <employee id='182'>
+            <firstname>Martha</firstname>
+            <lastname>Sullivan</lastname>
+            <email>MSULLIVA</email>
+            <phone>650.507.9878</phone>
+            <hiredate>1999-06-21</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>2500</salary>
+            <manager>120</manager>
+          </employee>
+          <employee id='183'>
+            <firstname>Girard</firstname>
+            <lastname>Geoni</lastname>
+            <email>GGEONI</email>
+            <phone>650.507.9879</phone>
+            <hiredate>2000-02-03</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>2800</salary>
+            <manager>120</manager>
+          </employee>
+          <employee id='184'>
+            <firstname>Nandita</firstname>
+            <lastname>Sarchand</lastname>
+            <email>NSARCHAN</email>
+            <phone>650.509.1876</phone>
+            <hiredate>1996-01-27</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>4200</salary>
+            <manager>121</manager>
+          </employee>
+          <employee id='185'>
+            <firstname>Alexis</firstname>
+            <lastname>Bull</lastname>
+            <email>ABULL</email>
+            <phone>650.509.2876</phone>
+            <hiredate>1997-02-20</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>4100</salary>
+            <manager>121</manager>
+          </employee>
+          <employee id='186'>
+            <firstname>Julia</firstname>
+            <lastname>Dellinger</lastname>
+            <email>JDELLING</email>
+            <phone>650.509.3876</phone>
+            <hiredate>1998-06-24</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3400</salary>
+            <manager>121</manager>
+          </employee>
+          <employee id='187'>
+            <firstname>Anthony</firstname>
+            <lastname>Cabrio</lastname>
+            <email>ACABRIO</email>
+            <phone>650.509.4876</phone>
+            <hiredate>1999-02-07</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3000</salary>
+            <manager>121</manager>
+          </employee>
+          <employee id='188'>
+            <firstname>Kelly</firstname>
+            <lastname>Chung</lastname>
+            <email>KCHUNG</email>
+            <phone>650.505.1876</phone>
+            <hiredate>1997-06-14</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3800</salary>
+            <manager>122</manager>
+          </employee>
+          <employee id='189'>
+            <firstname>Jennifer</firstname>
+            <lastname>Dilly</lastname>
+            <email>JDILLY</email>
+            <phone>650.505.2876</phone>
+            <hiredate>1997-08-13</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3600</salary>
+            <manager>122</manager>
+          </employee>
+          <employee id='190'>
+            <firstname>Timothy</firstname>
+            <lastname>Gates</lastname>
+            <email>TGATES</email>
+            <phone>650.505.3876</phone>
+            <hiredate>1998-07-11</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>2900</salary>
+            <manager>122</manager>
+          </employee>
+          <employee id='191'>
+            <firstname>Randall</firstname>
+            <lastname>Perkins</lastname>
+            <email>RPERKINS</email>
+            <phone>650.505.4876</phone>
+            <hiredate>1999-12-19</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>2500</salary>
+            <manager>122</manager>
+          </employee>
+          <employee id='192'>
+            <firstname>Sarah</firstname>
+            <lastname>Bell</lastname>
+            <email>SBELL</email>
+            <phone>650.501.1876</phone>
+            <hiredate>1996-02-04</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>4000</salary>
+            <manager>123</manager>
+          </employee>
+          <employee id='193'>
+            <firstname>Britney</firstname>
+            <lastname>Everett</lastname>
+            <email>BEVERETT</email>
+            <phone>650.501.2876</phone>
+            <hiredate>1997-03-03</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3900</salary>
+            <manager>123</manager>
+          </employee>
+          <employee id='194'>
+            <firstname>Samuel</firstname>
+            <lastname>McCain</lastname>
+            <email>SMCCAIN</email>
+            <phone>650.501.3876</phone>
+            <hiredate>1998-07-01</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3200</salary>
+            <manager>123</manager>
+          </employee>
+          <employee id='195'>
+            <firstname>Vance</firstname>
+            <lastname>Jones</lastname>
+            <email>VJONES</email>
+            <phone>650.501.4876</phone>
+            <hiredate>1999-03-17</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>2800</salary>
+            <manager>123</manager>
+          </employee>
+          <employee id='196'>
+            <firstname>Alana</firstname>
+            <lastname>Walsh</lastname>
+            <email>AWALSH</email>
+            <phone>650.507.9811</phone>
+            <hiredate>1998-04-24</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3100</salary>
+            <manager>124</manager>
+          </employee>
+          <employee id='197'>
+            <firstname>Kevin</firstname>
+            <lastname>Feeney</lastname>
+            <email>KFEENEY</email>
+            <phone>650.507.9822</phone>
+            <hiredate>1998-05-23</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>3000</salary>
+            <manager>124</manager>
+          </employee>
+          <employee id='198'>
+            <firstname>Donald</firstname>
+            <lastname>OConnell</lastname>
+            <email>DOCONNEL</email>
+            <phone>650.507.9833</phone>
+            <hiredate>1999-06-21</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>2600</salary>
+            <manager>124</manager>
+          </employee>
+          <employee id='199'>
+            <firstname>Douglas</firstname>
+            <lastname>Grant</lastname>
+            <email>DGRANT</email>
+            <phone>650.507.9844</phone>
+            <hiredate>2000-01-13</hiredate>
+            <jobid>SH_CLERK</jobid>
+            <salary>2600</salary>
+            <manager>124</manager>
+          </employee>
+        </department>
+      </location>
+      <location id='1600'>
+        <streetaddress>2007 Zagora St</streetaddress>
+        <postalcode>50090</postalcode>
+        <city>South Brunswick</city>
+        <stateprovince>New Jersey</stateprovince>
+      </location>
+      <location id='1700'>
+        <streetaddress>2004 Charade Rd</streetaddress>
+        <postalcode>98199</postalcode>
+        <city>Seattle</city>
+        <stateprovince>Washington</stateprovince>
+        <department manager='200' id='10'>
+          <name>Administration</name>
+          <employee id='200'>
+            <firstname>Jennifer</firstname>
+            <lastname>Whalen</lastname>
+            <email>JWHALEN</email>
+            <phone>515.123.4444</phone>
+            <hiredate>1987-09-17</hiredate>
+            <jobid>AD_ASST</jobid>
+            <salary>4400</salary>
+            <manager>101</manager>
+          </employee>
+        </department>
+        <department manager='114' id='30'>
+          <name>Purchasing</name>
+          <employee id='114'>
+            <firstname>Den</firstname>
+            <lastname>Raphaely</lastname>
+            <email>DRAPHEAL</email>
+            <phone>515.127.4561</phone>
+            <hiredate>1994-12-07</hiredate>
+            <jobid>PU_MAN</jobid>
+            <salary>11000</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='115'>
+            <firstname>Alexander</firstname>
+            <lastname>Khoo</lastname>
+            <email>AKHOO</email>
+            <phone>515.127.4562</phone>
+            <hiredate>1995-05-18</hiredate>
+            <jobid>PU_CLERK</jobid>
+            <salary>3100</salary>
+            <manager>114</manager>
+          </employee>
+          <employee id='116'>
+            <firstname>Shelli</firstname>
+            <lastname>Baida</lastname>
+            <email>SBAIDA</email>
+            <phone>515.127.4563</phone>
+            <hiredate>1997-12-24</hiredate>
+            <jobid>PU_CLERK</jobid>
+            <salary>2900</salary>
+            <manager>114</manager>
+          </employee>
+          <employee id='117'>
+            <firstname>Sigal</firstname>
+            <lastname>Tobias</lastname>
+            <email>STOBIAS</email>
+            <phone>515.127.4564</phone>
+            <hiredate>1997-07-24</hiredate>
+            <jobid>PU_CLERK</jobid>
+            <salary>2800</salary>
+            <manager>114</manager>
+          </employee>
+          <employee id='118'>
+            <firstname>Guy</firstname>
+            <lastname>Himuro</lastname>
+            <email>GHIMURO</email>
+            <phone>515.127.4565</phone>
+            <hiredate>1998-11-15</hiredate>
+            <jobid>PU_CLERK</jobid>
+            <salary>2600</salary>
+            <manager>114</manager>
+          </employee>
+          <employee id='119'>
+            <firstname>Karen</firstname>
+            <lastname>Colmenares</lastname>
+            <email>KCOLMENA</email>
+            <phone>515.127.4566</phone>
+            <hiredate>1999-08-10</hiredate>
+            <jobid>PU_CLERK</jobid>
+            <salary>2500</salary>
+            <manager>114</manager>
+          </employee>
+        </department>
+        <department manager='100' id='90'>
+          <name>Executive</name>
+          <employee id='100'>
+            <firstname>Steven</firstname>
+            <lastname>King</lastname>
+            <email>SKING</email>
+            <phone>515.123.4567</phone>
+            <hiredate>1987-06-17</hiredate>
+            <jobid>AD_PRES</jobid>
+            <salary>24000</salary>
+          </employee>
+          <employee id='101'>
+            <firstname>Neena</firstname>
+            <lastname>Kochhar</lastname>
+            <email>NKOCHHAR</email>
+            <phone>515.123.4568</phone>
+            <hiredate>1989-09-21</hiredate>
+            <jobid>AD_VP</jobid>
+            <salary>17000</salary>
+            <manager>100</manager>
+          </employee>
+          <employee id='102'>
+            <firstname>Lex</firstname>
+            <lastname>De Haan</lastname>
+            <email>LDEHAAN</email>
+            <phone>515.123.4569</phone>
+            <hiredate>1993-01-13</hiredate>
+            <jobid>AD_VP</jobid>
+            <salary>17000</salary>
+            <manager>100</manager>
+          </employee>
+        </department>
+        <department manager='108' id='100'>
+          <name>Finance</name>
+          <employee id='108'>
+            <firstname>Nancy</firstname>
+            <lastname>Greenberg</lastname>
+            <email>NGREENBE</email>
+            <phone>515.124.4569</phone>
+            <hiredate>1994-08-17</hiredate>
+            <jobid>FI_MGR</jobid>
+            <salary>12000</salary>
+            <manager>101</manager>
+          </employee>
+          <employee id='109'>
+            <firstname>Daniel</firstname>
+            <lastname>Faviet</lastname>
+            <email>DFAVIET</email>
+            <phone>515.124.4169</phone>
+            <hiredate>1994-08-16</hiredate>
+            <jobid>FI_ACCOUNT</jobid>
+            <salary>9000</salary>
+            <manager>108</manager>
+          </employee>
+          <employee id='110'>
+            <firstname>John</firstname>
+            <lastname>Chen</lastname>
+            <email>JCHEN</email>
+            <phone>515.124.4269</phone>
+            <hiredate>1997-09-28</hiredate>
+            <jobid>FI_ACCOUNT</jobid>
+            <salary>8200</salary>
+            <manager>108</manager>
+          </employee>
+          <employee id='111'>
+            <firstname>Ismael</firstname>
+            <lastname>Sciarra</lastname>
+            <email>ISCIARRA</email>
+            <phone>515.124.4369</phone>
+            <hiredate>1997-09-30</hiredate>
+            <jobid>FI_ACCOUNT</jobid>
+            <salary>7700</salary>
+            <manager>108</manager>
+          </employee>
+          <employee id='112'>
+            <firstname>Jose Manuel</firstname>
+            <lastname>Urman</lastname>
+            <email>JMURMAN</email>
+            <phone>515.124.4469</phone>
+            <hiredate>1998-03-07</hiredate>
+            <jobid>FI_ACCOUNT</jobid>
+            <salary>7800</salary>
+            <manager>108</manager>
+          </employee>
+          <employee id='113'>
+            <firstname>Luis</firstname>
+            <lastname>Popp</lastname>
+            <email>LPOPP</email>
+            <phone>515.124.4567</phone>
+            <hiredate>1999-12-07</hiredate>
+            <jobid>FI_ACCOUNT</jobid>
+            <salary>6900</salary>
+            <manager>108</manager>
+          </employee>
+        </department>
+        <department manager='205' id='110'>
+          <name>Accounting</name>
+          <employee id='205'>
+            <firstname>Shelley</firstname>
+            <lastname>Higgins</lastname>
+            <email>SHIGGINS</email>
+            <phone>515.123.8080</phone>
+            <hiredate>1994-06-07</hiredate>
+            <jobid>AC_MGR</jobid>
+            <salary>12000</salary>
+            <manager>101</manager>
+          </employee>
+          <employee id='206'>
+            <firstname>William</firstname>
+            <lastname>Gietz</lastname>
+            <email>WGIETZ</email>
+            <phone>515.123.8181</phone>
+            <hiredate>1994-06-07</hiredate>
+            <jobid>AC_ACCOUNT</jobid>
+            <salary>8300</salary>
+            <manager>205</manager>
+          </employee>
+        </department>
+        <department id='120'>
+          <name>Treasury</name>
+        </department>
+        <department id='130'>
+          <name>Corporate Tax</name>
+        </department>
+        <department id='140'>
+          <name>Control And Credit</name>
+        </department>
+        <department id='150'>
+          <name>Shareholder Services</name>
+        </department>
+        <department id='160'>
+          <name>Benefits</name>
+        </department>
+        <department id='170'>
+          <name>Manufacturing</name>
+        </department>
+        <department id='180'>
+          <name>Construction</name>
+        </department>
+        <department id='190'>
+          <name>Contracting</name>
+        </department>
+        <department id='200'>
+          <name>Operations</name>
+        </department>
+        <department id='210'>
+          <name>IT Support</name>
+        </department>
+        <department id='220'>
+          <name>NOC</name>
+        </department>
+        <department id='230'>
+          <name>IT Helpdesk</name>
+        </department>
+        <department id='240'>
+          <name>Government Sales</name>
+        </department>
+        <department id='250'>
+          <name>Retail Sales</name>
+        </department>
+        <department id='260'>
+          <name>Recruiting</name>
+        </department>
+        <department id='270'>
+          <name>Payroll</name>
+        </department>
+      </location>
+    </country>
+  </region>
+  <region id='3' name='Asia'>
+    <country id='AU'>
+      <name>Australia</name>
+      <location id='2200'>
+        <streetaddress>12-98 Victoria Street</streetaddress>
+        <postalcode>2901</postalcode>
+        <city>Sydney</city>
+        <stateprovince>New South Wales</stateprovince>
+      </location>
+    </country>
+    <country id='CN'>
+      <name>China</name>
+      <location id='2000'>
+        <streetaddress>40-5-12 Laogianggen</streetaddress>
+        <postalcode>190518</postalcode>
+        <city>Beijing</city>
+      </location>
+    </country>
+    <country id='HK'>
+      <name>HongKong</name>
+    </country>
+    <country id='IN'>
+      <name>India</name>
+      <location id='2100'>
+        <streetaddress>1298 Vileparle (E)</streetaddress>
+        <postalcode>490231</postalcode>
+        <city>Bombay</city>
+        <stateprovince>Maharashtra</stateprovince>
+      </location>
+    </country>
+    <country id='JP'>
+      <name>Japan</name>
+      <location id='1200'>
+        <streetaddress>2017 Shinjuku-ku</streetaddress>
+        <postalcode>1689</postalcode>
+        <city>Tokyo</city>
+        <stateprovince>Tokyo Prefecture</stateprovince>
+      </location>
+      <location id='1300'>
+        <streetaddress>9450 Kamiya-cho</streetaddress>
+        <postalcode>6823</postalcode>
+        <city>Hiroshima</city>
+      </location>
+    </country>
+    <country id='SG'>
+      <name>Singapore</name>
+      <location id='2300'>
+        <streetaddress>198 Clementi North</streetaddress>
+        <postalcode>540198</postalcode>
+        <city>Singapore</city>
+      </location>
+    </country>
+  </region>
+  <region id='4' name='Middle East and Africa'>
+    <country id='EG'>
+      <name>Egypt</name>
+    </country>
+    <country id='IL'>
+      <name>Israel</name>
+    </country>
+    <country id='KW'>
+      <name>Kuwait</name>
+    </country>
+    <country id='NG'>
+      <name>Nigeria</name>
+    </country>
+    <country id='ZM'>
+      <name>Zambia</name>
+    </country>
+    <country id='ZW'>
+      <name>Zimbabwe</name>
+    </country>
+  </region>
+</staffinfo>
