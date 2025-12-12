@@ -39,34 +39,40 @@ return
   <CountJobTitle> {$k} </CountJobTitle>
 
 }</Result_Example_XQuery>""",
-            1  # Expected: single XML wrapper containing titles and count
+            1,  # Expected: single XML wrapper containing titles and count
+            True,
         ),
         (
             "XQuery with version declaration only",
             """xquery version "1.0";
 //staffinfo/job/title/text()""",
-            3  # Expected: 3 titles
+            3,
+            False,
         ),
         (
             "XQuery with comments",
             """(: This is a comment :)
 //staffinfo/job/title/text()""",
-            3  # Expected: 3 titles
+            3,
+            False,
         ),
         (
             "XQuery with doc() function",
             """doc("staffinfo.xml")/staffinfo/job/title/text()""",
-            3  # Expected: 3 titles
+            3,
+            False,
         ),
         (
             "Simple XPath (should pass through)",
             """//staffinfo/job/title/text()""",
-            3  # Expected: 3 titles
+            3,
+            False,
         ),
         (
             "Count query",
             """count(//staffinfo/job/title)""",
-            1  # Expected: count result
+            1,
+            False,
         ),
     ]
     
@@ -76,7 +82,7 @@ return
     passed = 0
     failed = 0
     
-    for description, query, expected_count in test_cases:
+    for description, query, expected_count, expect_wrapper in test_cases:
         print(f"\n{description}")
         print("-" * 80)
         print(f"Query: {query[:100]}..." if len(query) > 100 else f"Query: {query}")
@@ -103,7 +109,7 @@ return
             if len(results) > 3:
                 print(f"    ... and {len(results) - 3} more")
             
-            if description == "Original problematic query from issue":
+            if expect_wrapper:
                 assert actual_count == 1, "Wrapper query should return a single XML string"
                 wrapped = results[0]
                 assert "<Result_Example_XQuery>" in wrapped, "Wrapper element should be preserved"
