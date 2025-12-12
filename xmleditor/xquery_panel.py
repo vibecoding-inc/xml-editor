@@ -5,7 +5,7 @@ XQuery panel for executing XQuery expressions with file-based editor.
 import os
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QTextEdit, QFileDialog, QMessageBox,
-                              QSplitter, QFrame, QLineEdit, QListWidget, QListWidgetItem)
+                              QSplitter, QFrame, QLineEdit)
 from PyQt6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.Qsci import QsciScintilla
@@ -203,16 +203,16 @@ class XQueryPanel(QWidget):
         
         bottom_layout.addWidget(status_frame)
         
-        # Results list widget
+        # Results display widget (code view)
         results_label = QLabel("Results:")
         bottom_layout.addWidget(results_label)
         
-        self.result_list = QListWidget()
-        self.result_list.setAlternatingRowColors(True)
-        self.result_list.setWordWrap(True)
+        self.result_display = QTextEdit()
+        self.result_display.setReadOnly(True)
+        self.result_display.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         font = QFont("Courier New", 9)
-        self.result_list.setFont(font)
-        bottom_layout.addWidget(self.result_list)
+        self.result_display.setFont(font)
+        bottom_layout.addWidget(self.result_display)
         
         splitter.addWidget(bottom_widget)
         
@@ -357,10 +357,10 @@ class XQueryPanel(QWidget):
         self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('red')};")
         self.result_count_label.setText("")
         
-        self.result_list.clear()
-        item = QListWidgetItem(f"❌ {message}")
-        item.setForeground(QColor(theme.get_color('red')))
-        self.result_list.addItem(item)
+        self.result_display.setStyleSheet(
+            f"background-color: {theme.get_color('base')}; color: {theme.get_color('red')};"
+        )
+        self.result_display.setPlainText(f"❌ {message}")
     
     def show_results(self, message, results):
         """Display query results."""
@@ -371,28 +371,35 @@ class XQueryPanel(QWidget):
             self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('green')};")
             self.result_count_label.setText(f"{len(results)} result(s)")
             
-            self.result_list.clear()
+            lines = []
             for i, result in enumerate(results, 1):
                 result_str = str(result).strip()
                 # Limit display length for very long results
                 if len(result_str) > self.MAX_RESULT_DISPLAY_LENGTH:
                     result_str = result_str[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
-                
-                item = QListWidgetItem(f"[{i}] {result_str}")
-                item.setForeground(QColor(theme.get_color('text')))
-                self.result_list.addItem(item)
+                lines.append(f"[{i}] {result_str}")
+            
+            self.result_display.setStyleSheet(
+                f"background-color: {theme.get_color('base')}; color: {theme.get_color('text')};"
+            )
+            self.result_display.setPlainText("\n\n".join(lines))
         else:
             self.status_label.setText("Success")
             self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('blue')};")
             self.result_count_label.setText("0 results")
             
-            self.result_list.clear()
-            item = QListWidgetItem("ℹ️ Query executed successfully (empty result)")
-            item.setForeground(QColor(theme.get_color('blue')))
-            self.result_list.addItem(item)
+            self.result_display.setStyleSheet(
+                f"background-color: {theme.get_color('base')}; color: {theme.get_color('blue')};"
+            )
+            self.result_display.setPlainText("ℹ️ Query executed successfully (empty result)")
     
     def apply_theme(self, theme_type):
         """Apply theme to the panel."""
         self.theme_type = theme_type
         if hasattr(self, 'xquery_editor'):
             self.xquery_editor.apply_theme(theme_type)
+        if hasattr(self, 'result_display'):
+            theme = ThemeManager.get_theme(theme_type)
+            self.result_display.setStyleSheet(
+                f"background-color: {theme.get_color('base')}; color: {theme.get_color('text')};"
+            )
