@@ -55,6 +55,7 @@ class MainWindow(QMainWindow):
         
         self.tab_data = {}  # Map tab index to {file_path, is_modified} for primary tabs
         self.split_tab_data = {}  # Same mapping for split-view tabs
+        self.editor_tab_map = {}  # Map editor widgets to their parent tab widget
         self.last_active_editor = None
         self.init_ui()
         self.create_new_document()
@@ -866,10 +867,11 @@ class MainWindow(QMainWindow):
     
     def get_current_editor(self):
         """Get the currently active editor widget."""
-        if self.last_active_editor and hasattr(self.last_active_editor, 'parent_tab_widget'):
-            parent_widget = self.last_active_editor.parent_tab_widget
+        if self.last_active_editor:
+            parent_widget = self.editor_tab_map.get(self.last_active_editor)
             if parent_widget and parent_widget.indexOf(self.last_active_editor) != -1:
                 return self.last_active_editor
+            self.last_active_editor = None
         # Fallback to primary tab
         primary_editor = self.tab_widget.currentWidget()
         if isinstance(primary_editor, XMLEditor):
@@ -899,10 +901,11 @@ class MainWindow(QMainWindow):
     
     def get_active_tab_widget(self):
         """Return the tab widget containing the last-focused editor."""
-        if self.last_active_editor and hasattr(self.last_active_editor, 'parent_tab_widget'):
-            tab_widget = self.last_active_editor.parent_tab_widget
+        if self.last_active_editor:
+            tab_widget = self.editor_tab_map.get(self.last_active_editor)
             if tab_widget and tab_widget.indexOf(self.last_active_editor) != -1:
                 return tab_widget
+            self.last_active_editor = None
         if self.tab_widget.count() or not self.split_tab_widget.count():
             return self.tab_widget
         return self.split_tab_widget
@@ -910,6 +913,16 @@ class MainWindow(QMainWindow):
     def _get_data_store(self, tab_widget):
         """Return the appropriate tab data store for the given widget."""
         return self.tab_data if tab_widget is self.tab_widget else self.split_tab_data
+    
+    def _shift_tab_data_after_removal(self, data_store, removed_index):
+        """Reindex tab data after removing a tab."""
+        new_tab_data = {}
+        for i, data in data_store.items():
+            if i < removed_index:
+                new_tab_data[i] = data
+            elif i > removed_index:
+                new_tab_data[i - 1] = data
+        return new_tab_data
     
     def _update_split_dock_visibility(self):
         """Hide the split dock when it has no tabs."""
@@ -968,16 +981,16 @@ class MainWindow(QMainWindow):
             elif reply == QMessageBox.StandardButton.Cancel:
                 return
         
+        removed_editor = tab_widget.widget(index)
+        
         # Remove tab
         tab_widget.removeTab(index)
+        self.editor_tab_map.pop(removed_editor, None)
+        if self.last_active_editor is removed_editor:
+            self.last_active_editor = None
         
         # Update tab_data dictionary (shift indices)
-        new_tab_data = {}
-        for i, data in data_store.items():
-            if i < index:
-                new_tab_data[i] = data
-            elif i > index:
-                new_tab_data[i - 1] = data
+        new_tab_data = self._shift_tab_data_after_removal(data_store, index)
         if tab_widget is self.tab_widget:
             self.tab_data = new_tab_data
         else:
@@ -992,13 +1005,13 @@ class MainWindow(QMainWindow):
         """Create a new editor tab."""
         tab_widget = tab_widget or self.tab_widget
         editor = XMLEditor(theme_type=self.current_theme, focus_callback=self.on_editor_focused)
-        editor.parent_tab_widget = tab_widget
         editor.textChanged.connect(self.on_text_changed)
         if content:
             editor.set_text(content)
         
         index = tab_widget.addTab(editor, title)
         tab_widget.setCurrentIndex(index)
+        self.editor_tab_map[editor] = tab_widget
         
         # Track if this is a pristine untitled tab (never edited by user)
         # Pristine tabs can be closed without prompting and are auto-closed when opening files
@@ -1679,12 +1692,7 @@ class MainWindow(QMainWindow):
         
         # Remove from source
         source_widget.removeTab(index)
-        new_src_data = {}
-        for i, data in data_store_src.items():
-            if i < index:
-                new_src_data[i] = data
-            elif i > index:
-                new_src_data[i - 1] = data
+        new_src_data = self._shift_tab_data_after_removal(data_store_src, index)
         if source_widget is self.tab_widget:
             self.tab_data = new_src_data
         else:
@@ -1699,9 +1707,9 @@ class MainWindow(QMainWindow):
         # Add to destination
         new_index = dest_widget.addTab(editor, title)
         dest_widget.setCurrentIndex(new_index)
-        editor.parent_tab_widget = dest_widget
         dest_store = self._get_data_store(dest_widget)
         dest_store[new_index] = tab_data
+        self.editor_tab_map[editor] = dest_widget
         
         self.last_active_editor = editor
         self.update_window_title()
@@ -1787,22 +1795,21 @@ class MainWindow(QMainWindow):
         """Update window title based on current file and modified state."""
         title = "XML Editor"
         
-        tab_data = self.get_current_tab_data()
-        if tab_data:
-            file_path = tab_data.get('file_path')
-            is_modified = tab_data.get('is_modified', False)
-            
-            if file_path:
-                title += f" - {os.path.basename(file_path)}"
-            else:
-                title += " - Untitled"
-            
-            if is_modified:
-                title += " *"
+        tab_data = self.get_current_tab_data() or {}
+        file_path = tab_data.get('file_path')
+        is_modified = tab_data.get('is_modified', False)
+        
+        if file_path:
+            title += f" - {os.path.basename(file_path)}"
+        else:
+            title += " - Untitled"
+        
+        if is_modified:
+            title += " *"
         
         self.setWindowTitle(title)
         view_name = "Split" if self.get_active_tab_widget() is self.split_tab_widget else "Main"
-        display_name = os.path.basename(tab_data.get('file_path')) if tab_data and tab_data.get('file_path') else "Untitled"
+        display_name = os.path.basename(file_path) if file_path else "Untitled"
         self.active_view_label.setText(f"{view_name}: {display_name}")
         
     def check_save_changes(self):
