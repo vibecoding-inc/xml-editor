@@ -142,7 +142,7 @@ def test_production_xquery():
         if len(preprocessed) < 100:
             print(f"Preprocessed: {preprocessed}")
         
-        success, message, results = XMLUtilities.execute_xquery(xml_content, query)
+        success, message, results, metadata = XMLUtilities.execute_xquery(xml_content, query)
         
         if success:
             actual_count = len(results)

@@ -51,7 +51,7 @@ def test_xquery():
         print(f"Query: {query}")
         print("-" * 80)
         
-        success, message, results = XMLUtilities.execute_xquery(xml_content, query)
+        success, message, results, metadata = XMLUtilities.execute_xquery(xml_content, query)
         
         if success:
             print(f"✓ {message}")

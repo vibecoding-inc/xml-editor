@@ -50,7 +50,7 @@ print("-" * 80)
 
 print("\nExecution Results:")
 print("-" * 80)
-success, message, results = XMLUtilities.execute_xquery(xml_content, problematic_xquery)
+success, message, results, metadata = XMLUtilities.execute_xquery(xml_content, problematic_xquery)
 
 if success:
     print(f"✓ SUCCESS: {message}")

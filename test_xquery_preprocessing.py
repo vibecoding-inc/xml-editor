@@ -81,7 +81,7 @@ return
         print("-" * 80)
         print(f"Query: {query[:100]}..." if len(query) > 100 else f"Query: {query}")
         
-        success, message, results = XMLUtilities.execute_xquery(xml_content, query)
+        success, message, results, metadata = XMLUtilities.execute_xquery(xml_content, query)
         
         if success:
             actual_count = len(results)
