@@ -765,6 +765,93 @@ class XMLUtilities:
         return query
     
     @staticmethod
+    def _render_template_query(xml_string: str, xquery_string: str) -> Tuple[bool, str, List[str]]:
+        """
+        Render an XQuery template that mixes literal XML/text with enclosed expressions { ... }.
+        Each enclosed expression is preprocessed and evaluated, and the result is interpolated
+        into the final output.
+        """
+        # Strip leading comments/pragmas/version/declare statements
+        template = re.sub(r'\(:.*?:\)', '', xquery_string, flags=re.DOTALL)
+        template = re.sub(r'\(#.*?#\)', '', template, flags=re.DOTALL)
+        template = re.sub(r'xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;\s*', '', template, flags=re.IGNORECASE)
+        template = re.sub(r'declare\s+[^;]*;\s*', '', template, flags=re.IGNORECASE)
+        
+        tree = etree.fromstring(xml_string.encode('utf-8'))
+        parser = XPath30Parser()
+        context = elementpath.XPathContext(tree)
+        
+        parts: List[str] = []
+        literal_buf: List[str] = []
+        expr_buf: List[str] = []
+        expr_depth = 0
+        i = 0
+        while i < len(template):
+            ch = template[i]
+            if expr_depth == 0 and ch == '{':
+                # Flush literal buffer
+                if literal_buf:
+                    parts.append(''.join(literal_buf))
+                    literal_buf = []
+                expr_depth = 1
+                expr_buf = []
+                i += 1
+                continue
+            elif expr_depth > 0:
+                if ch == '{':
+                    expr_depth += 1
+                    expr_buf.append(ch)
+                elif ch == '}':
+                    expr_depth -= 1
+                    if expr_depth == 0:
+                        expr = ''.join(expr_buf).strip()
+                        if not expr:
+                            parts.append('')
+                        else:
+                            processed = XMLUtilities.preprocess_xquery(expr)
+                            query = parser.parse(processed.strip())
+                            result = query.evaluate(context=context)
+                            if result is None:
+                                evaluated: List = []
+                            elif isinstance(result, (list, tuple)):
+                                evaluated = list(result)
+                            elif hasattr(result, '__iter__') and not isinstance(result, str):
+                                evaluated = list(result)
+                            else:
+                                evaluated = [result]
+                            
+                            rendered = []
+                            for item in evaluated:
+                                if hasattr(item, 'elem'):
+                                    rendered.append(etree.tostring(item.elem, encoding='unicode', pretty_print=True))
+                                elif isinstance(item, str):
+                                    rendered.append(item)
+                                elif hasattr(item, 'value'):
+                                    rendered.append(str(item.value))
+                                else:
+                                    rendered.append(str(item))
+                            parts.append(''.join(rendered))
+                        expr_buf = []
+                    else:
+                        expr_buf.append('}')
+                else:
+                    expr_buf.append(ch)
+                i += 1
+                continue
+            else:
+                literal_buf.append(ch)
+            i += 1
+        
+        if expr_depth != 0:
+            return False, "XQuery execution error: unmatched braces in template", []
+        
+        if literal_buf:
+            parts.append(''.join(literal_buf))
+        
+        rendered_output = ''.join(parts)
+        return True, f"Query executed successfully (1 result(s))", [rendered_output.strip()]
+    
+    @staticmethod
     def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List]:
         """
         Execute XQuery expression against XML document.
@@ -783,10 +870,17 @@ class XMLUtilities:
             return False, "XQuery support not available. Install 'elementpath' package.", []
         
         try:
+            # If the query looks like an XML template with embedded expressions, render it directly
+            stripped_query = xquery_string.strip()
+            if stripped_query.startswith('<') and '{' in stripped_query and '}' in stripped_query:
+                success, message, results = XMLUtilities._render_template_query(xml_string, xquery_string)
+                if success:
+                    return success, message, results
+                # Fall through to standard path on failure
+            
             # Detect outer element wrapper to reconstruct structured output after execution
             wrapper_tag = None
             inner_query = xquery_string
-            stripped_query = xquery_string.strip()
             wrapper_prefix = (
                 r'(?:\(:.*?:\)\s*)*'  # Leading XQuery comments
                 r'(?:xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;\s*)?'  # Version declaration
