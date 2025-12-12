@@ -614,17 +614,11 @@ class XMLUtilities:
         """
         import re
         
-        # Remove XQuery comments (: ... :)
-        query = re.sub(r'\(:[^:]*:\)', '', xquery_string)
+        # Remove XQuery comments (: ... :) - non-greedy match to handle colons inside comments
+        query = re.sub(r'\(:.*?:\)', '', xquery_string, flags=re.DOTALL)
         
         # Remove XQuery version declarations
         query = re.sub(r'xquery\s+version\s+"[^"]*"\s*;', '', query, flags=re.IGNORECASE)
-        
-        # Remove element construction wrappers like <Result>{...}</Result>
-        # Extract content between outer element tags
-        element_wrapper_match = re.search(r'<[^>]+>\s*\{(.*)\}\s*</[^>]+>', query, re.DOTALL)
-        if element_wrapper_match:
-            query = element_wrapper_match.group(1)
         
         # Handle doc() function - remove it and keep the path
         # doc("file.xml")/path -> /path
@@ -634,28 +628,39 @@ class XMLUtilities:
         # This is invalid: "return expr, let $var := ..."
         # Convert to sequence: "(expr1, expr2)"
         
-        # Find patterns like: return ... , let ... return ...
-        flwor_pattern = r'for\s+\$\w+\s+in\s+([^\n]+)\s+return\s+([^,]+),\s*let\s+\$(\w+)\s*:=\s*([^\n]+)\s+return\s+(.+)'
+        # First check if there's an outer element wrapper that wraps the entire query
+        # Only match if the element starts near the beginning and ends near the end
+        query_stripped = query.strip()
+        if query_stripped.startswith('<') and query_stripped.endswith('>'):
+            outer_wrapper_match = re.match(r'^\s*<([^>]+)>\s*\{(.*)\}\s*</\1>\s*$', query_stripped, re.DOTALL)
+            if outer_wrapper_match:
+                # Extract content and process it
+                query = outer_wrapper_match.group(2)
+        
+        # Find patterns like: for $var in path return expr, let $letvar := expr return expr
+        # More flexible pattern that captures the actual variable names
+        flwor_pattern = r'for\s+\$(\w+)\s+in\s+(.+?)\s+return\s+(.+?),\s*let\s+\$(\w+)\s*:=\s*(.+?)\s+return\s+(.+)'
         flwor_match = re.search(flwor_pattern, query, re.DOTALL)
         
         if flwor_match:
-            # Extract the components
-            for_path = flwor_match.group(1).strip()
-            first_return_expr = flwor_match.group(2).strip()
-            let_var = flwor_match.group(3).strip()
-            let_expr = flwor_match.group(4).strip()
-            second_return_expr = flwor_match.group(5).strip()
+            # Extract the components with actual variable names
+            for_var = flwor_match.group(1).strip()
+            for_path = flwor_match.group(2).strip()
+            first_return_expr = flwor_match.group(3).strip()
+            let_var = flwor_match.group(4).strip()
+            let_expr = flwor_match.group(5).strip()
+            second_return_expr = flwor_match.group(6).strip()
             
-            # Convert element construction to text if present
+            # Convert element construction to text if present in each expression
             # <JobTitle> {$s/text()} </JobTitle> -> $s/text()
             first_return_expr = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', first_return_expr)
             second_return_expr = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', second_return_expr)
             
-            # Replace $k with the actual expression
+            # Replace let variable with the actual expression in second return
             second_return_expr = second_return_expr.replace(f'${let_var}', let_expr)
             
-            # Create a simple sequence expression
-            query = f'(for $s in {for_path} return {first_return_expr}, {second_return_expr})'
+            # Create a simple sequence expression using the actual for variable name
+            query = f'(for ${for_var} in {for_path} return {first_return_expr}, {second_return_expr})'
         
         return query.strip()
     
