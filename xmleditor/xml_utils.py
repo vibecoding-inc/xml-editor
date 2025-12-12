@@ -670,7 +670,7 @@ class XMLUtilities:
             Convert simple element constructors into string concatenations so they can be represented
             in XPath 3.0 execution results.
             """
-            element_pattern = r'<(?P<tag>[\w:-]+)(?:\s+[^>]*?)?>\s*\{(?P<content>[^}]*)\}\s*</(?P=tag)>'
+            element_pattern = r'<(?P<tag>[\w:-]+)(?:\s+[^>]*)?>\s*\{(?P<content>[^}]*)\}\s*</(?P=tag)>'
             def _repl(match: re.Match) -> str:
                 tag = match.group('tag')
                 content = match.group('content').strip()
@@ -784,7 +784,7 @@ class XMLUtilities:
             wrapper_prefix = (
                 r'(?:\(:.*?:\)\s*)*'  # Leading XQuery comments
                 r'(?:xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;\s*)?'  # Version declaration
-                r'(?:declare\s+[^\;]+;\s*)*'  # Declare statements
+                r'(?:declare\s+[^;]*;\s*)*'  # Declare statements
             )
             wrapper_pattern = (
                 r'^\s*' + wrapper_prefix +
@@ -836,7 +836,7 @@ class XMLUtilities:
             
             # If the query was wrapped in an element constructor, rebuild the structured XML output
             if wrapper_tag is not None:
-                wrapped_content = ''.join(str(part) for part in formatted_results)
+                wrapped_content = ''.join(formatted_results)
                 formatted_results = [f"<{wrapper_tag}>{wrapped_content}</{wrapper_tag}>"]
             
             if not formatted_results:
