@@ -436,12 +436,28 @@ class XQueryPanel(QWidget):
         
         # Add results as child elements
         if child_elements:
-            # If we have specific child element names, use them
-            child_element_name = child_elements[0] if child_elements else "Item"
-            for result in results:
-                child = etree.SubElement(root, child_element_name)
-                result_str = str(result).strip()
-                child.text = result_str
+            # Strategy for mapping results to element names:
+            # If we have multiple element types (e.g., from comma-separated returns),
+            # use a heuristic: first element type for most results, last element type for the final result
+            if len(child_elements) > 1 and len(results) > 1:
+                # Use first element type for all but the last result
+                for i, result in enumerate(results):
+                    if i < len(results) - 1:
+                        child_element_name = child_elements[0]
+                    else:
+                        # Last result uses the last element type
+                        child_element_name = child_elements[-1]
+                    
+                    child = etree.SubElement(root, child_element_name)
+                    result_str = str(result).strip()
+                    child.text = result_str
+            else:
+                # Single element type or single result - use first element name for all
+                child_element_name = child_elements[0] if child_elements else "Item"
+                for result in results:
+                    child = etree.SubElement(root, child_element_name)
+                    result_str = str(result).strip()
+                    child.text = result_str
         else:
             # No specific child elements, wrap each result
             for result in results:
