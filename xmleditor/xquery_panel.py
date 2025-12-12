@@ -5,7 +5,8 @@ XQuery panel for executing XQuery expressions with file-based editor.
 import os
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QTextEdit, QFileDialog, QMessageBox,
-                              QSplitter, QFrame, QLineEdit, QListWidget, QListWidgetItem)
+                              QSplitter, QFrame, QLineEdit, QListWidget, QListWidgetItem,
+                              QStackedWidget)
 from PyQt6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.Qsci import QsciScintilla
@@ -203,16 +204,28 @@ class XQueryPanel(QWidget):
         
         bottom_layout.addWidget(status_frame)
         
-        # Results list widget
+        # Results display - use stacked widget to switch between list and XML view
         results_label = QLabel("Results:")
         bottom_layout.addWidget(results_label)
         
+        self.result_stack = QStackedWidget()
+        
+        # Page 0: List view (for results without element construction)
         self.result_list = QListWidget()
         self.result_list.setAlternatingRowColors(True)
         self.result_list.setWordWrap(True)
         font = QFont("Courier New", 9)
         self.result_list.setFont(font)
-        bottom_layout.addWidget(self.result_list)
+        self.result_stack.addWidget(self.result_list)
+        
+        # Page 1: XML document view (for results with element construction)
+        self.result_xml = QTextEdit()
+        self.result_xml.setReadOnly(True)
+        self.result_xml.setFont(font)
+        self.result_xml.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        self.result_stack.addWidget(self.result_xml)
+        
+        bottom_layout.addWidget(self.result_stack)
         
         splitter.addWidget(bottom_widget)
         
@@ -343,10 +356,10 @@ class XQueryPanel(QWidget):
             return
         
         # Execute the query
-        success, message, results = XMLUtilities.execute_xquery(xml_content, xquery)
+        success, message, results, metadata = XMLUtilities.execute_xquery(xml_content, xquery)
         
         if success:
-            self.show_results(message, results)
+            self.show_results(message, results, metadata)
         else:
             self.show_error(message)
     
@@ -357,12 +370,14 @@ class XQueryPanel(QWidget):
         self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('red')};")
         self.result_count_label.setText("")
         
+        # Show error in list view
+        self.result_stack.setCurrentIndex(0)
         self.result_list.clear()
         item = QListWidgetItem(f"❌ {message}")
         item.setForeground(QColor(theme.get_color('red')))
         self.result_list.addItem(item)
     
-    def show_results(self, message, results):
+    def show_results(self, message, results, metadata=None):
         """Display query results."""
         theme = ThemeManager.get_theme(self.theme_type)
         
@@ -371,25 +386,83 @@ class XQueryPanel(QWidget):
             self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('green')};")
             self.result_count_label.setText(f"{len(results)} result(s)")
             
-            self.result_list.clear()
-            for i, result in enumerate(results, 1):
-                result_str = str(result).strip()
-                # Limit display length for very long results
-                if len(result_str) > self.MAX_RESULT_DISPLAY_LENGTH:
-                    result_str = result_str[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
-                
-                item = QListWidgetItem(f"[{i}] {result_str}")
-                item.setForeground(QColor(theme.get_color('text')))
-                self.result_list.addItem(item)
+            # Check if we have element construction metadata
+            if metadata and (metadata.get('root_element') or metadata.get('child_elements')):
+                # Display as XML document
+                self.show_xml_result(results, metadata, theme)
+            else:
+                # Display as list
+                self.show_list_result(results, theme)
         else:
             self.status_label.setText("Success")
             self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('blue')};")
             self.result_count_label.setText("0 results")
             
+            self.result_stack.setCurrentIndex(0)
             self.result_list.clear()
             item = QListWidgetItem("ℹ️ Query executed successfully (empty result)")
             item.setForeground(QColor(theme.get_color('blue')))
             self.result_list.addItem(item)
+    
+    def show_list_result(self, results, theme):
+        """Display results as a list."""
+        self.result_stack.setCurrentIndex(0)
+        self.result_list.clear()
+        for i, result in enumerate(results, 1):
+            result_str = str(result).strip()
+            # Limit display length for very long results
+            if len(result_str) > self.MAX_RESULT_DISPLAY_LENGTH:
+                result_str = result_str[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
+            
+            item = QListWidgetItem(f"[{i}] {result_str}")
+            item.setForeground(QColor(theme.get_color('text')))
+            self.result_list.addItem(item)
+    
+    def show_xml_result(self, results, metadata, theme):
+        """Display results as an XML document."""
+        from lxml import etree
+        
+        self.result_stack.setCurrentIndex(1)
+        
+        # Build XML document from results
+        root_element = metadata.get('root_element')
+        child_elements = metadata.get('child_elements') or []
+        
+        # Create root element
+        if root_element:
+            root = etree.Element(root_element)
+        else:
+            root = etree.Element("Result")
+        
+        # Add results as child elements
+        if child_elements:
+            # If we have specific child element names, use them
+            child_element_name = child_elements[0] if child_elements else "Item"
+            for result in results:
+                child = etree.SubElement(root, child_element_name)
+                result_str = str(result).strip()
+                child.text = result_str
+        else:
+            # No specific child elements, wrap each result
+            for result in results:
+                child = etree.SubElement(root, "Item")
+                result_str = str(result).strip()
+                child.text = result_str
+        
+        # Serialize to string with pretty print (no XML declaration for unicode)
+        xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n'
+        xml_str += etree.tostring(root, encoding='unicode', pretty_print=True)
+        
+        # Display in text edit
+        self.result_xml.setPlainText(xml_str)
+        
+        # Apply theme colors to XML view
+        self.result_xml.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {theme.get_color('base')};
+                color: {theme.get_color('text')};
+            }}
+        """)
     
     def apply_theme(self, theme_type):
         """Apply theme to the panel."""

@@ -747,7 +747,51 @@ class XMLUtilities:
         return query
     
     @staticmethod
-    def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List]:
+    def extract_element_construction(xquery_string: str) -> Tuple[Optional[str], Optional[List[str]]]:
+        """
+        Extract element construction information from XQuery.
+        
+        Args:
+            xquery_string: Raw XQuery expression
+            
+        Returns:
+            Tuple of (root_element, child_elements)
+            - root_element: Name of outer wrapper element (if any)
+            - child_elements: List of element names in return statements
+        """
+        # Extract outer wrapper element
+        root_element = None
+        query_stripped = xquery_string.strip()
+        
+        # Remove comments first
+        query_no_comments = re.sub(r'\(:.*?:\)', '', query_stripped, flags=re.DOTALL)
+        
+        # Remove version declarations
+        query_no_comments = re.sub(r'xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;', '', query_no_comments, flags=re.IGNORECASE)
+        query_no_comments = query_no_comments.strip()
+        
+        # Check for outer wrapper like <Result>{...}</Result>
+        outer_match = re.match(r'^\s*<(\w+)[^>]*>\s*\{.*\}\s*</(\w+)>\s*$', query_no_comments, re.DOTALL)
+        if outer_match and outer_match.group(1) == outer_match.group(2):
+            root_element = outer_match.group(1)
+        
+        # Extract element names from return statements
+        child_elements = []
+        
+        # Pattern for return with element construction: return <ElementName>{...}</ElementName>
+        return_pattern = r'return\s+<(\w+)[^>]*>\s*\{[^}]*\}\s*</\1>'
+        for match in re.finditer(return_pattern, query_no_comments, re.DOTALL | re.IGNORECASE):
+            element_name = match.group(1)
+            if element_name not in child_elements:
+                child_elements.append(element_name)
+        
+        if root_element or child_elements:
+            return root_element, child_elements if child_elements else None
+        
+        return None, None
+    
+    @staticmethod
+    def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List, Optional[dict]]:
         """
         Execute XQuery expression against XML document.
         
@@ -756,15 +800,25 @@ class XMLUtilities:
             xquery_string: XQuery expression (XPath 3.0 syntax)
             
         Returns:
-            Tuple of (success, message, results)
+            Tuple of (success, message, results, metadata)
             - success: True if execution succeeded
             - message: Success or error message
             - results: List of result items
+            - metadata: Dict with element construction info (or None)
         """
         if not XQUERY_AVAILABLE:
-            return False, "XQuery support not available. Install 'elementpath' package.", []
+            return False, "XQuery support not available. Install 'elementpath' package.", [], None
         
         try:
+            # Extract element construction metadata before preprocessing
+            root_element, child_elements = XMLUtilities.extract_element_construction(xquery_string)
+            metadata = None
+            if root_element or child_elements:
+                metadata = {
+                    'root_element': root_element,
+                    'child_elements': child_elements
+                }
+            
             # Preprocess XQuery to handle unsupported syntax
             processed_query = XMLUtilities.preprocess_xquery(xquery_string)
             
@@ -805,9 +859,9 @@ class XMLUtilities:
                     formatted_results.append(str(item))
             
             if not formatted_results:
-                return True, "Query executed successfully (empty result)", []
+                return True, "Query executed successfully (empty result)", [], metadata
             
-            return True, f"Query executed successfully ({len(formatted_results)} result(s))", formatted_results
+            return True, f"Query executed successfully ({len(formatted_results)} result(s))", formatted_results, metadata
             
         except Exception as e:
-            return False, f"XQuery execution error: {str(e)}", []
+            return False, f"XQuery execution error: {str(e)}", [], None
