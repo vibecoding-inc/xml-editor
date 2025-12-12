@@ -689,26 +689,30 @@ class XMLUtilities:
             if let_var and let_expr:
                 let_var = let_var.strip()
                 let_expr = let_expr.strip()
+                # Escape variable name to prevent ReDoS attacks
+                let_var_escaped = re.escape(let_var)
                 # Substitute let variable in return expression
-                return_expr = re.sub(r'\$' + let_var + r'(?!\w)', let_expr, return_expr)
+                return_expr = re.sub(r'\$' + let_var_escaped + r'(?!\w)', let_expr, return_expr)
                 # Also substitute in where condition if present
                 if where_cond:
-                    where_cond = re.sub(r'\$' + let_var + r'(?!\w)', let_expr, where_cond)
+                    where_cond = re.sub(r'\$' + let_var_escaped + r'(?!\w)', let_expr, where_cond)
             
             # Handle where clause by adding it as a predicate
             if where_cond:
                 where_cond = where_cond.strip()
+                # Escape variable name to prevent ReDoS attacks
+                for_var_escaped = re.escape(for_var)
                 # Replace $var with . in the condition for predicate
                 # But handle attributes specially: $var/@attr -> @attr (not ./@attr)
-                where_pred = re.sub(r'\$' + for_var + r'/@', '@', where_cond)
-                where_pred = re.sub(r'\$' + for_var + r'/([^\s\)]+)', r'./\1', where_pred)
-                where_pred = re.sub(r'\$' + for_var + r'(?!\w|/)', '.', where_pred)
+                where_pred = re.sub(r'\$' + for_var_escaped + r'/@', '@', where_cond)
+                where_pred = re.sub(r'\$' + for_var_escaped + r'/([^\s\)]+)', r'./\1', where_pred)
+                where_pred = re.sub(r'\$' + for_var_escaped + r'(?!\w|/)', '.', where_pred)
                 converted = f'{converted}[{where_pred}]'
             
-            # Handle order by - convert to sort() function call if possible
+            # Handle order by - not directly supported in XPath 3.0
+            # Ordering would require sorting the result sequence which isn't practical
             if order_expr:
-                # For simple cases, we can't directly order in XPath 3.0
-                # Just add a comment for now
+                # Log warning: order by clause is not supported and will be ignored
                 pass
             
             converted = f'{converted} return {return_expr}'
@@ -732,8 +736,9 @@ class XMLUtilities:
             first_return = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', first_return)
             second_return = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', second_return)
             
-            # Substitute let variable
-            second_return = re.sub(r'\$' + let_var + r'(?!\w)', let_expr, second_return)
+            # Substitute let variable with escaped pattern to prevent ReDoS
+            let_var_escaped = re.escape(let_var)
+            second_return = re.sub(r'\$' + let_var_escaped + r'(?!\w)', let_expr, second_return)
             
             # Create sequence
             converted = f'(for ${for_var} in {for_path} return {first_return}, {second_return})'
