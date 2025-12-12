@@ -427,6 +427,7 @@ class XQueryPanel(QWidget):
         # Build XML document from results
         root_element = metadata.get('root_element')
         child_elements = metadata.get('child_elements') or []
+        structure_info = metadata.get('structure_info') or {}
         
         # Create root element
         if root_element:
@@ -436,23 +437,29 @@ class XQueryPanel(QWidget):
         
         # Add results as child elements
         if child_elements:
-            # Strategy for mapping results to element names:
-            # If we have multiple element types (e.g., from comma-separated returns),
-            # use a heuristic: first element type for most results, last element type for the final result
-            if len(child_elements) > 1 and len(results) > 1:
-                # Use first element type for all but the last result
+            # Use structure info to properly map results to elements
+            pattern = structure_info.get('pattern')
+            
+            if pattern == 'comma_separated' and len(child_elements) == 2 and len(results) >= 1:
+                # Comma-separated FLWOR: for...return (sequence), let...return (singleton)
+                # The last result is from the singleton, all others are from the sequence
+                parts = structure_info.get('parts', [])
+                sequence_element = parts[0]['element'] if len(parts) > 0 else child_elements[0]
+                singleton_element = parts[1]['element'] if len(parts) > 1 else child_elements[1]
+                
                 for i, result in enumerate(results):
                     if i < len(results) - 1:
-                        child_element_name = child_elements[0]
+                        # Items from the sequence (for...return)
+                        child_element_name = sequence_element
                     else:
-                        # Last result uses the last element type
-                        child_element_name = child_elements[-1]
+                        # Last item is the singleton (let...return)
+                        child_element_name = singleton_element
                     
                     child = etree.SubElement(root, child_element_name)
                     result_str = str(result).strip()
                     child.text = result_str
             else:
-                # Single element type or single result - use first element name for all
+                # Unknown pattern or single element type - use first element name for all
                 child_element_name = child_elements[0] if child_elements else "Item"
                 for result in results:
                     child = etree.SubElement(root, child_element_name)

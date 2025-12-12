@@ -747,7 +747,7 @@ class XMLUtilities:
         return query
     
     @staticmethod
-    def extract_element_construction(xquery_string: str) -> Tuple[Optional[str], Optional[List[str]]]:
+    def extract_element_construction(xquery_string: str) -> Tuple[Optional[str], Optional[List], Optional[dict]]:
         """
         Extract element construction information from XQuery.
         
@@ -755,9 +755,10 @@ class XMLUtilities:
             xquery_string: Raw XQuery expression
             
         Returns:
-            Tuple of (root_element, child_elements)
+            Tuple of (root_element, child_elements, structure_info)
             - root_element: Name of outer wrapper element (if any)
-            - child_elements: List of element names in return statements
+            - child_elements: List of element names in return statements (in order)
+            - structure_info: Dict with query structure details for better mapping
         """
         # Extract outer wrapper element
         root_element = None
@@ -775,20 +776,38 @@ class XMLUtilities:
         if outer_match and outer_match.group(1) == outer_match.group(2):
             root_element = outer_match.group(1)
         
-        # Extract element names from return statements
+        # Extract element names and structure from return statements
         child_elements = []
+        structure_info = {'pattern': 'unknown', 'parts': []}
         
-        # Pattern for return with element construction: return <ElementName>{...}</ElementName>
-        return_pattern = r'return\s+<(\w+)[^>]*>\s*\{[^}]*\}\s*</\1>'
-        for match in re.finditer(return_pattern, query_no_comments, re.DOTALL | re.IGNORECASE):
-            element_name = match.group(1)
-            if element_name not in child_elements:
-                child_elements.append(element_name)
+        # Check for comma-separated FLWOR pattern: for...return..., let...return
+        comma_flwor = r'for\s+\$\w+\s+in\s+[^\r\n]+\s+return\s+<(\w+)[^>]*>\s*\{[^}]*\}\s*</\1>\s*,\s*let\s+\$\w+\s*:=\s*[^\r\n]+\s+return\s+<(\w+)[^>]*>\s*\{[^}]*\}\s*</\2>'
+        comma_match = re.search(comma_flwor, query_no_comments, re.DOTALL | re.IGNORECASE)
+        
+        if comma_match:
+            # Comma-separated pattern detected
+            first_element = comma_match.group(1)
+            second_element = comma_match.group(2)
+            child_elements = [first_element, second_element]
+            structure_info = {
+                'pattern': 'comma_separated',
+                'parts': [
+                    {'element': first_element, 'type': 'sequence', 'description': 'for...return (multiple items)'},
+                    {'element': second_element, 'type': 'singleton', 'description': 'let...return (single item)'}
+                ]
+            }
+        else:
+            # General pattern: extract all return statements with element construction
+            return_pattern = r'return\s+<(\w+)[^>]*>\s*\{[^}]*\}\s*</\1>'
+            for match in re.finditer(return_pattern, query_no_comments, re.DOTALL | re.IGNORECASE):
+                element_name = match.group(1)
+                if element_name not in child_elements:
+                    child_elements.append(element_name)
         
         if root_element or child_elements:
-            return root_element, child_elements if child_elements else None
+            return root_element, child_elements if child_elements else None, structure_info
         
-        return None, None
+        return None, None, None
     
     @staticmethod
     def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List, Optional[dict]]:
@@ -811,12 +830,13 @@ class XMLUtilities:
         
         try:
             # Extract element construction metadata before preprocessing
-            root_element, child_elements = XMLUtilities.extract_element_construction(xquery_string)
+            root_element, child_elements, structure_info = XMLUtilities.extract_element_construction(xquery_string)
             metadata = None
             if root_element or child_elements:
                 metadata = {
                     'root_element': root_element,
-                    'child_elements': child_elements
+                    'child_elements': child_elements,
+                    'structure_info': structure_info
                 }
             
             # Preprocess XQuery to handle unsupported syntax
