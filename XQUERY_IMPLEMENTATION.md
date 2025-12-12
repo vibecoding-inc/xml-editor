@@ -164,11 +164,43 @@ max(//book/price)
 string-join(//book/author/text(), ', ')
 ```
 
+### XQuery Syntax with Preprocessing
+The following XQuery syntax is automatically converted to valid XPath 3.0:
+
+```xquery
+(: Example XQuery with version declaration and comments :)
+xquery version "1.0";
+<Result>{
+  for $s in doc("data.xml")/path/to/element
+  return
+    <Item> {$s/text()} </Item>,
+  let $k := count(doc("data.xml")/path/to/element)
+  return
+    <Count> {$k} </Count>
+}</Result>
+```
+
+This is automatically preprocessed to:
+```xquery
+(for $s in /path/to/element return $s/text(), count(/path/to/element))
+```
+
+## XQuery Syntax Preprocessing
+To improve compatibility, the system automatically preprocesses XQuery expressions to convert unsupported syntax to XPath 3.0:
+- **XQuery version declarations** (`xquery version "1.0";`) are removed
+- **XQuery comments** (`(: comment :)`) are stripped
+- **doc() function calls** are replaced with direct path references
+- **Invalid FLWOR structures** (e.g., `let` after `return`) are converted to valid sequences
+- **Element construction** in FLWOR expressions is converted to text output
+
+This preprocessing allows many common XQuery patterns to work even though the underlying engine is XPath 3.0.
+
 ## Limitations
 - XPath 3.0 support only (not full XQuery 3.0)
-- Limited FLWOR support (no `where`, `order by`, `group by`)
+- Limited FLWOR support (no standalone `let`, `where`, `order by`, `group by`)
 - No XQuery modules or imports
 - No schema-aware processing
+- Element construction is converted to text output
 
 ## Future Enhancements
 - Consider full XQuery 3.0 processor (e.g., Saxon/HE)
