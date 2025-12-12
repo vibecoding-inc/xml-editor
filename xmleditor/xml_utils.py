@@ -858,6 +858,10 @@ class XMLUtilities:
             # Preprocess XQuery to handle unsupported syntax
             processed_query = XMLUtilities.preprocess_xquery(xquery_string)
             
+            # Check if query is empty after preprocessing
+            if not processed_query or not processed_query.strip():
+                return False, "XQuery is empty after preprocessing. Please provide a valid XPath or XQuery expression.", [], None
+            
             # Parse XML
             tree = etree.fromstring(xml_string.encode('utf-8'))
             
