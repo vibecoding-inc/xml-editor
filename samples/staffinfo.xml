@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<staffinfo>
+    <job>
+        <title>President</title>
+        <salary>200000</salary>
+    </job>
+    <job>
+        <title>Finance Manager</title>
+        <salary>100000</salary>
+    </job>
+    <job>
+        <title>Finance Manager</title>
+        <salary>95000</salary>
+    </job>
+    <job>
+        <title>Finance Manager</title>
+        <salary>98000</salary>
+    </job>
+    <job>
+        <title>Finance Manager</title>
+        <salary>97000</salary>
+    </job>
+    <job>
+        <title>Finance Manager</title>
+        <salary>96000</salary>
+    </job>
+</staffinfo>
