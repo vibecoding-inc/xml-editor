@@ -15,6 +15,13 @@ except ImportError:
 
 BRACE_CONTENT_PATTERN = r'(?:[^{}]|\{[^{}]*\})*'
 
+def _strip_prelude(text: str) -> str:
+    """Remove comments, pragmas, version and declare prelude from XQuery/XPath text."""
+    stripped = re.sub(r'\(:.*?:\)', '', text, flags=re.DOTALL)
+    stripped = re.sub(r'\(#.*?#\)', '', stripped, flags=re.DOTALL)
+    stripped = re.sub(r'xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;\s*', '', stripped, flags=re.IGNORECASE)
+    stripped = re.sub(r'declare\s+[^;]*;\s*', '', stripped, flags=re.IGNORECASE)
+    return stripped.strip()
 
 class XMLUtilities:
     """Utilities for XML operations."""
@@ -772,10 +779,7 @@ class XMLUtilities:
         into the final output.
         """
         # Strip leading comments/pragmas/version/declare statements
-        template = re.sub(r'\(:.*?:\)', '', xquery_string, flags=re.DOTALL)
-        template = re.sub(r'\(#.*?#\)', '', template, flags=re.DOTALL)
-        template = re.sub(r'xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;\s*', '', template, flags=re.IGNORECASE)
-        template = re.sub(r'declare\s+[^;]*;\s*', '', template, flags=re.IGNORECASE)
+        template = _strip_prelude(xquery_string)
         
         tree = etree.fromstring(xml_string.encode('utf-8'))
         parser = XPath30Parser()
@@ -872,7 +876,8 @@ class XMLUtilities:
         try:
             # If the query looks like an XML template with embedded expressions, render it directly
             stripped_query = xquery_string.strip()
-            if stripped_query.startswith('<') and '{' in stripped_query and '}' in stripped_query:
+            prelude_stripped = _strip_prelude(stripped_query)
+            if prelude_stripped.startswith('<') and '{' in prelude_stripped and '}' in prelude_stripped:
                 success, message, results = XMLUtilities._render_template_query(xml_string, xquery_string)
                 if success:
                     return success, message, results
