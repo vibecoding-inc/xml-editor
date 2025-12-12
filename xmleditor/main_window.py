@@ -53,7 +53,9 @@ class MainWindow(QMainWindow):
         self.auto_save_enabled = self.settings.value("auto_save_enabled", False, type=bool)
         self.auto_save_interval = self.settings.value("auto_save_interval", 30, type=int)  # seconds
         
-        self.tab_data = {}  # Map tab index to {file_path, is_modified}
+        self.tab_data = {}  # Map tab index to {file_path, is_modified} for primary tabs
+        self.split_tab_data = {}  # Same mapping for split-view tabs
+        self.last_active_editor = None
         self.init_ui()
         self.create_new_document()
         
@@ -74,12 +76,12 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create tab widget for multiple editors
+        # Create tab widget for multiple editors (primary)
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabsClosable(True)
         self.tab_widget.setMovable(True)
-        self.tab_widget.tabCloseRequested.connect(self.close_tab)
-        self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        self.tab_widget.tabCloseRequested.connect(lambda idx: self.close_tab(idx, self.tab_widget))
+        self.tab_widget.currentChanged.connect(lambda idx: self.on_tab_changed(idx, self.tab_widget))
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.tab_widget)
@@ -92,6 +94,20 @@ class MainWindow(QMainWindow):
         splitter.setSizes([700, 300])
         
         layout.addWidget(splitter)
+        
+        # Create split-view dock (can be floated to another monitor)
+        self.split_tab_widget = QTabWidget()
+        self.split_tab_widget.setTabsClosable(True)
+        self.split_tab_widget.setMovable(True)
+        self.split_tab_widget.tabCloseRequested.connect(lambda idx: self.close_tab(idx, self.split_tab_widget))
+        self.split_tab_widget.currentChanged.connect(lambda idx: self.on_tab_changed(idx, self.split_tab_widget))
+        
+        self.split_dock = QDockWidget("Split View", self)
+        self.split_dock.setObjectName("SplitViewDock")
+        self.split_dock.setWidget(self.split_tab_widget)
+        self.split_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.split_dock)
+        self.split_dock.hide()
         
         # Create error/output panel as dock widget
         self.create_output_panel()
@@ -312,6 +328,20 @@ class MainWindow(QMainWindow):
         
         view_menu.addSeparator()
         
+        self.toggle_split_view_action = QAction("Toggle Split View", self)
+        self.toggle_split_view_action.setCheckable(True)
+        self.toggle_split_view_action.triggered.connect(self.toggle_split_view)
+        view_menu.addAction(self.toggle_split_view_action)
+        self.split_dock.visibilityChanged.connect(lambda visible: self.toggle_split_view_action.setChecked(visible))
+        self.toggle_split_view_action.setChecked(self.split_dock.isVisible())
+        
+        move_to_split_action = QAction("Move Tab to Split View", self)
+        move_to_split_action.setShortcut(QKeySequence("Ctrl+\\"))
+        move_to_split_action.triggered.connect(self.move_tab_to_split_view)
+        view_menu.addAction(move_to_split_action)
+        
+        view_menu.addSeparator()
+        
         word_wrap_action = QAction("Word &Wrap", self)
         word_wrap_action.setCheckable(True)
         word_wrap_action.triggered.connect(self.toggle_word_wrap)
@@ -408,7 +438,10 @@ class MainWindow(QMainWindow):
         
     def create_status_bar(self):
         """Create status bar."""
-        self.statusBar().showMessage("Ready")
+        status_bar = self.statusBar()
+        status_bar.showMessage("Ready")
+        self.active_view_label = QLabel("")
+        status_bar.addPermanentWidget(self.active_view_label)
         
     def create_output_panel(self):
         """Create output/error panel."""
@@ -833,40 +866,76 @@ class MainWindow(QMainWindow):
     
     def get_current_editor(self):
         """Get the currently active editor widget."""
-        current_index = self.tab_widget.currentIndex()
-        if current_index >= 0:
-            return self.tab_widget.widget(current_index)
+        if self.last_active_editor:
+            parent_widget = getattr(self.last_active_editor, 'parent_tab_widget', None)
+            if parent_widget and parent_widget.indexOf(self.last_active_editor) != -1:
+                return self.last_active_editor
+        # Fallback to primary tab
+        primary_editor = self.tab_widget.currentWidget()
+        if isinstance(primary_editor, XMLEditor):
+            return primary_editor
+        # Fallback to split view
+        split_editor = self.split_tab_widget.currentWidget()
+        if isinstance(split_editor, XMLEditor):
+            return split_editor
         return None
     
     def get_current_tab_data(self):
         """Get data for the current tab."""
-        current_index = self.tab_widget.currentIndex()
-        if current_index >= 0 and current_index in self.tab_data:
-            return self.tab_data[current_index]
+        tab_widget = self.get_active_tab_widget()
+        current_index = tab_widget.currentIndex()
+        data_store = self._get_data_store(tab_widget)
+        if current_index >= 0 and current_index in data_store:
+            return data_store[current_index]
         return None
     
     def set_current_tab_data(self, data):
         """Set data for the current tab."""
-        current_index = self.tab_widget.currentIndex()
+        tab_widget = self.get_active_tab_widget()
+        current_index = tab_widget.currentIndex()
+        data_store = self._get_data_store(tab_widget)
         if current_index >= 0:
-            self.tab_data[current_index] = data
+            data_store[current_index] = data
     
-    def on_tab_changed(self, index):
+    def get_active_tab_widget(self):
+        """Return the tab widget containing the last-focused editor."""
+        if self.last_active_editor:
+            tab_widget = getattr(self.last_active_editor, 'parent_tab_widget', None)
+            if tab_widget and tab_widget.indexOf(self.last_active_editor) != -1:
+                return tab_widget
+        return self.tab_widget if self.tab_widget.count() or not self.split_tab_widget.count() else self.split_tab_widget
+    
+    def _get_data_store(self, tab_widget):
+        """Return the appropriate tab data store for the given widget."""
+        return self.tab_data if tab_widget is self.tab_widget else self.split_tab_data
+    
+    def on_editor_focused(self, editor):
+        """Track the last active editor for tool window actions."""
+        self.last_active_editor = editor
+        self.update_window_title()
+    
+    def on_tab_changed(self, index, tab_widget=None):
         """Handle tab change event."""
+        tab_widget = tab_widget or self.tab_widget
         if index >= 0:
+            widget = tab_widget.widget(index)
+            if isinstance(widget, XMLEditor):
+                self.last_active_editor = widget
             self.refresh_tree_view()
             self.update_window_title()
             # Refresh graph view if visible
             if self.graph_dock.isVisible():
                 self.refresh_graph_view()
     
-    def close_tab(self, index):
+    def close_tab(self, index, tab_widget=None):
         """Close a tab."""
-        if index < 0 or index >= self.tab_widget.count():
+        tab_widget = tab_widget or self.tab_widget
+        if index < 0 or index >= tab_widget.count():
             return
         
+        data_store = self._get_data_store(tab_widget)
         # Check if tab has unsaved changes (only prompt if not pristine)
-        tab_data = self.tab_data.get(index, {})
+        tab_data = data_store.get(index, {})
         is_pristine = tab_data.get('is_pristine', False)
         is_modified = tab_data.get('is_modified', False)
         
@@ -883,49 +952,56 @@ class MainWindow(QMainWindow):
             )
             
             if reply == QMessageBox.StandardButton.Save:
-                current_index = self.tab_widget.currentIndex()
-                self.tab_widget.setCurrentIndex(index)
+                current_index = tab_widget.currentIndex()
+                tab_widget.setCurrentIndex(index)
+                self.last_active_editor = tab_widget.widget(index)
                 self.save_file()
-                self.tab_widget.setCurrentIndex(current_index)
+                tab_widget.setCurrentIndex(current_index)
             elif reply == QMessageBox.StandardButton.Cancel:
                 return
         
         # Remove tab
-        self.tab_widget.removeTab(index)
+        tab_widget.removeTab(index)
         
         # Update tab_data dictionary (shift indices)
         new_tab_data = {}
-        for i, data in self.tab_data.items():
+        for i, data in data_store.items():
             if i < index:
                 new_tab_data[i] = data
             elif i > index:
                 new_tab_data[i - 1] = data
-        self.tab_data = new_tab_data
+        if tab_widget is self.tab_widget:
+            self.tab_data = new_tab_data
+        else:
+            self.split_tab_data = new_tab_data
         
-        # If no tabs left, create a new one
-        if self.tab_widget.count() == 0:
+        # If no tabs remain in either area, create a new one to keep editor usable
+        if self.tab_widget.count() == 0 and self.split_tab_widget.count() == 0:
             self.create_new_document()
     
-    def create_editor_tab(self, title="Untitled", content="", file_path=None):
+    def create_editor_tab(self, title="Untitled", content="", file_path=None, tab_widget=None):
         """Create a new editor tab."""
-        editor = XMLEditor(theme_type=self.current_theme)
+        tab_widget = tab_widget or self.tab_widget
+        editor = XMLEditor(theme_type=self.current_theme, focus_callback=self.on_editor_focused)
+        editor.parent_tab_widget = tab_widget
         editor.textChanged.connect(self.on_text_changed)
         if content:
             editor.set_text(content)
         
-        index = self.tab_widget.addTab(editor, title)
-        self.tab_widget.setCurrentIndex(index)
+        index = tab_widget.addTab(editor, title)
+        tab_widget.setCurrentIndex(index)
         
         # Track if this is a pristine untitled tab (never edited by user)
         # Pristine tabs can be closed without prompting and are auto-closed when opening files
         is_pristine = file_path is None
-        
-        self.tab_data[index] = {
+        data_store = self._get_data_store(tab_widget)
+        data_store[index] = {
             'file_path': file_path,
             'is_modified': False,
             'is_pristine': is_pristine
         }
         
+        self.last_active_editor = editor
         self.update_window_title()
         return editor
         
@@ -946,41 +1022,52 @@ class MainWindow(QMainWindow):
         if file_path:
             self.load_file(file_path)
             
-    def load_file(self, file_path):
+    def load_file(self, file_path, target_widget=None):
         """Load file from path."""
+        target_widget = target_widget or self.get_active_tab_widget()
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
             # Check if file is already open in a tab
-            for index in range(self.tab_widget.count()):
-                tab_data = self.tab_data.get(index, {})
-                if tab_data.get('file_path') == file_path:
-                    self.tab_widget.setCurrentIndex(index)
-                    QMessageBox.information(self, "File Already Open", 
-                                          f"The file {os.path.basename(file_path)} is already open.")
-                    return
+            for widget, data_store in (
+                (self.tab_widget, self.tab_data),
+                (self.split_tab_widget, self.split_tab_data)
+            ):
+                for index in range(widget.count()):
+                    tab_data = data_store.get(index, {})
+                    if tab_data.get('file_path') == file_path:
+                        widget.setCurrentIndex(index)
+                        self.last_active_editor = widget.widget(index)
+                        QMessageBox.information(self, "File Already Open", 
+                                              f"The file {os.path.basename(file_path)} is already open.")
+                        return
             
             # Close any pristine untitled tabs before opening the new file
             # Iterate in reverse to avoid index shifting issues
-            for index in range(self.tab_widget.count() - 1, -1, -1):
-                tab_data = self.tab_data.get(index, {})
+            data_store = self._get_data_store(target_widget)
+            for index in range(target_widget.count() - 1, -1, -1):
+                tab_data = data_store.get(index, {})
                 if tab_data.get('is_pristine', False) and tab_data.get('file_path') is None:
-                    self.tab_widget.removeTab(index)
+                    target_widget.removeTab(index)
                     # Update tab_data dictionary (shift indices)
                     new_tab_data = {}
-                    for i, data in self.tab_data.items():
+                    for i, data in data_store.items():
                         if i < index:
                             new_tab_data[i] = data
                         elif i > index:
                             new_tab_data[i - 1] = data
-                    self.tab_data = new_tab_data
+                    if target_widget is self.tab_widget:
+                        self.tab_data = new_tab_data
+                    else:
+                        self.split_tab_data = new_tab_data
             
             # Create new tab for the file
             self.create_editor_tab(
                 title=os.path.basename(file_path),
                 content=content,
-                file_path=file_path
+                file_path=file_path,
+                tab_widget=target_widget
             )
             
             self.add_recent_file(file_path)
@@ -1017,14 +1104,16 @@ class MainWindow(QMainWindow):
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(editor.get_text())
             
-            current_index = self.tab_widget.currentIndex()
-            self.tab_data[current_index] = {
+            tab_widget = self.get_active_tab_widget()
+            current_index = tab_widget.currentIndex()
+            data_store = self._get_data_store(tab_widget)
+            data_store[current_index] = {
                 'file_path': file_path,
                 'is_modified': False
             }
             
             # Update tab title
-            self.tab_widget.setTabText(current_index, os.path.basename(file_path))
+            tab_widget.setTabText(current_index, os.path.basename(file_path))
             
             self.update_window_title()
             self.add_recent_file(file_path)
@@ -1048,25 +1137,29 @@ class MainWindow(QMainWindow):
         """Perform auto-save for all modified tabs with file paths."""
         saved_count = 0
         
-        for index in range(self.tab_widget.count()):
-            tab_data = self.tab_data.get(index, {})
-            file_path = tab_data.get('file_path')
-            is_modified = tab_data.get('is_modified', False)
-            
-            # Only auto-save files that have a path (not "Untitled" documents) and are modified
-            if file_path and is_modified:
-                editor = self.tab_widget.widget(index)
-                if editor:
-                    try:
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            f.write(editor.get_text())
-                        
-                        # Mark as not modified after successful save
-                        self.tab_data[index]['is_modified'] = False
-                        saved_count += 1
-                    except Exception as e:
-                        # Silently log errors during auto-save to avoid disrupting user
-                        print(f"Auto-save failed for {file_path}: {str(e)}")
+        for tab_widget, data_store in (
+            (self.tab_widget, self.tab_data),
+            (self.split_tab_widget, self.split_tab_data)
+        ):
+            for index in range(tab_widget.count()):
+                tab_data = data_store.get(index, {})
+                file_path = tab_data.get('file_path')
+                is_modified = tab_data.get('is_modified', False)
+                
+                # Only auto-save files that have a path (not "Untitled" documents) and are modified
+                if file_path and is_modified:
+                    editor = tab_widget.widget(index)
+                    if editor:
+                        try:
+                            with open(file_path, 'w', encoding='utf-8') as f:
+                                f.write(editor.get_text())
+                            
+                            # Mark as not modified after successful save
+                            data_store[index]['is_modified'] = False
+                            saved_count += 1
+                        except Exception as e:
+                            # Silently log errors during auto-save to avoid disrupting user
+                            print(f"Auto-save failed for {file_path}: {str(e)}")
         
         # Update window title for current tab
         if saved_count > 0:
@@ -1555,6 +1648,59 @@ class MainWindow(QMainWindow):
         else:
             self.xquery_dock.show()
     
+    def toggle_split_view(self, checked):
+        """Toggle visibility of the split-view dock."""
+        if checked:
+            self.split_dock.show()
+        else:
+            self.split_dock.hide()
+    
+    def move_tab_to_split_view(self):
+        """Move the active tab between the main area and the split-view dock."""
+        source_widget = self.get_active_tab_widget()
+        if not isinstance(source_widget, QTabWidget):
+            return
+        index = source_widget.currentIndex()
+        if index < 0:
+            return
+        
+        dest_widget = self.split_tab_widget if source_widget is self.tab_widget else self.tab_widget
+        data_store_src = self._get_data_store(source_widget)
+        tab_data = data_store_src.get(index, {'file_path': None, 'is_modified': False, 'is_pristine': False})
+        editor = source_widget.widget(index)
+        title = source_widget.tabText(index)
+        
+        # Remove from source
+        source_widget.removeTab(index)
+        new_src_data = {}
+        for i, data in data_store_src.items():
+            if i < index:
+                new_src_data[i] = data
+            elif i > index:
+                new_src_data[i - 1] = data
+        if source_widget is self.tab_widget:
+            self.tab_data = new_src_data
+        else:
+            self.split_tab_data = new_src_data
+            if self.split_tab_widget.count() == 0:
+                self.split_dock.hide()
+                self.toggle_split_view_action.setChecked(False)
+        
+        # Show split dock if moving into it
+        if dest_widget is self.split_tab_widget:
+            self.split_dock.show()
+            self.toggle_split_view_action.setChecked(True)
+        
+        # Add to destination
+        new_index = dest_widget.addTab(editor, title)
+        dest_widget.setCurrentIndex(new_index)
+        editor.parent_tab_widget = dest_widget
+        dest_store = self._get_data_store(dest_widget)
+        dest_store[new_index] = tab_data
+        
+        self.last_active_editor = editor
+        self.update_window_title()
+        
     def refresh_graph_view(self):
         """Refresh the XML graph view."""
         editor = self.get_current_editor()
@@ -1600,6 +1746,10 @@ class MainWindow(QMainWindow):
             editor = self.tab_widget.widget(i)
             if isinstance(editor, XMLEditor):
                 editor.apply_theme(theme_type)
+        for i in range(self.split_tab_widget.count()):
+            editor = self.split_tab_widget.widget(i)
+            if isinstance(editor, XMLEditor):
+                editor.apply_theme(theme_type)
         
         # Apply theme to XQuery panel
         if hasattr(self, 'xquery_panel'):
@@ -1610,16 +1760,18 @@ class MainWindow(QMainWindow):
             
     def on_text_changed(self):
         """Handle text changed event."""
-        current_index = self.tab_widget.currentIndex()
+        tab_widget = self.get_active_tab_widget()
+        current_index = tab_widget.currentIndex()
+        data_store = self._get_data_store(tab_widget)
         if current_index >= 0:
-            tab_data = self.tab_data.get(current_index, {})
+            tab_data = data_store.get(current_index, {})
             # Only mark as not pristine if this is a user edit (not initial content loading)
             # We detect this by checking if is_modified was already False (initial state)
             if not tab_data.get('is_modified', False):
                 # First change - mark as no longer pristine (user has edited)
                 tab_data['is_pristine'] = False
             tab_data['is_modified'] = True
-            self.tab_data[current_index] = tab_data
+            data_store[current_index] = tab_data
             self.update_window_title()
         
         # Restart timer for auto-refreshing tree view (debounce)
@@ -1644,32 +1796,41 @@ class MainWindow(QMainWindow):
                 title += " *"
         
         self.setWindowTitle(title)
+        if hasattr(self, 'active_view_label'):
+            view_name = "Split" if self.get_active_tab_widget() is self.split_tab_widget else "Main"
+            display_name = os.path.basename(tab_data.get('file_path')) if tab_data and tab_data.get('file_path') else "Untitled"
+            self.active_view_label.setText(f"{view_name}: {display_name}")
         
     def check_save_changes(self):
         """Check if there are unsaved changes in any tab and prompt user."""
-        for index in range(self.tab_widget.count()):
-            tab_data = self.tab_data.get(index, {})
-            is_modified = tab_data.get('is_modified', False)
-            is_pristine = tab_data.get('is_pristine', False)
-            
-            # Only prompt for save if the tab was actually edited by the user (not pristine)
-            if is_modified and not is_pristine:
-                file_path = tab_data.get('file_path')
-                file_name = os.path.basename(file_path) if file_path else 'Untitled'
+        for tab_widget, data_store in (
+            (self.tab_widget, self.tab_data),
+            (self.split_tab_widget, self.split_tab_data)
+        ):
+            for index in range(tab_widget.count()):
+                tab_data = data_store.get(index, {})
+                is_modified = tab_data.get('is_modified', False)
+                is_pristine = tab_data.get('is_pristine', False)
                 
-                reply = QMessageBox.question(
-                    self, "Unsaved Changes",
-                    f"Do you want to save changes to {file_name}?",
-                    QMessageBox.StandardButton.Save | 
-                    QMessageBox.StandardButton.Discard | 
-                    QMessageBox.StandardButton.Cancel
-                )
-                
-                if reply == QMessageBox.StandardButton.Save:
-                    self.tab_widget.setCurrentIndex(index)
-                    self.save_file()
-                elif reply == QMessageBox.StandardButton.Cancel:
-                    return False
+                # Only prompt for save if the tab was actually edited by the user (not pristine)
+                if is_modified and not is_pristine:
+                    file_path = tab_data.get('file_path')
+                    file_name = os.path.basename(file_path) if file_path else 'Untitled'
+                    
+                    reply = QMessageBox.question(
+                        self, "Unsaved Changes",
+                        f"Do you want to save changes to {file_name}?",
+                        QMessageBox.StandardButton.Save | 
+                        QMessageBox.StandardButton.Discard | 
+                        QMessageBox.StandardButton.Cancel
+                    )
+                    
+                    if reply == QMessageBox.StandardButton.Save:
+                        tab_widget.setCurrentIndex(index)
+                        self.last_active_editor = tab_widget.widget(index)
+                        self.save_file()
+                    elif reply == QMessageBox.StandardButton.Cancel:
+                        return False
         
         return True
         
