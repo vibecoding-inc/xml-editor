@@ -4,6 +4,7 @@ XML utilities for parsing, validating, and manipulating XML documents.
 
 from lxml import etree
 import xml.dom.minidom
+import re
 from typing import Optional, List, Tuple
 try:
     from elementpath.xpath30 import XPath30Parser
@@ -612,8 +613,6 @@ class XMLUtilities:
         Returns:
             Preprocessed XPath 3.0 compatible expression
         """
-        import re
-        
         # Remove XQuery comments (: ... :) - non-greedy match to handle colons inside comments
         query = re.sub(r'\(:.*?:\)', '', xquery_string, flags=re.DOTALL)
         
@@ -632,24 +631,25 @@ class XMLUtilities:
         # Only match if the element starts near the beginning and ends near the end
         query_stripped = query.strip()
         if query_stripped.startswith('<') and query_stripped.endswith('>'):
-            outer_wrapper_match = re.match(r'^\s*<([^>]+)>\s*\{(.*)\}\s*</\1>\s*$', query_stripped, re.DOTALL)
-            if outer_wrapper_match:
+            # Use simple tag name matching instead of backreference to avoid ReDoS
+            outer_wrapper_match = re.match(r'^\s*<(\w+)[^>]*>\s*\{(.*)\}\s*</(\w+)>\s*$', query_stripped, re.DOTALL)
+            if outer_wrapper_match and outer_wrapper_match.group(1) == outer_wrapper_match.group(3):
                 # Extract content and process it
                 query = outer_wrapper_match.group(2)
         
         # Find patterns like: for $var in path return expr, let $letvar := expr return expr
-        # More flexible pattern that captures the actual variable names
-        flwor_pattern = r'for\s+\$(\w+)\s+in\s+(.+?)\s+return\s+(.+?),\s*let\s+\$(\w+)\s*:=\s*(.+?)\s+return\s+(.+)'
+        # Use named groups for better readability and maintenance
+        flwor_pattern = r'for\s+\$(?P<for_var>\w+)\s+in\s+(?P<for_path>[^\r\n]+)\s+return\s+(?P<first_return>[^,]+),\s*let\s+\$(?P<let_var>\w+)\s*:=\s*(?P<let_expr>[^\r\n]+)\s+return\s+(?P<second_return>.+)'
         flwor_match = re.search(flwor_pattern, query, re.DOTALL)
         
         if flwor_match:
-            # Extract the components with actual variable names
-            for_var = flwor_match.group(1).strip()
-            for_path = flwor_match.group(2).strip()
-            first_return_expr = flwor_match.group(3).strip()
-            let_var = flwor_match.group(4).strip()
-            let_expr = flwor_match.group(5).strip()
-            second_return_expr = flwor_match.group(6).strip()
+            # Extract the components using named groups
+            for_var = flwor_match.group('for_var').strip()
+            for_path = flwor_match.group('for_path').strip()
+            first_return_expr = flwor_match.group('first_return').strip()
+            let_var = flwor_match.group('let_var').strip()
+            let_expr = flwor_match.group('let_expr').strip()
+            second_return_expr = flwor_match.group('second_return').strip()
             
             # Convert element construction to text if present in each expression
             # <JobTitle> {$s/text()} </JobTitle> -> $s/text()
@@ -657,7 +657,8 @@ class XMLUtilities:
             second_return_expr = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', second_return_expr)
             
             # Replace let variable with the actual expression in second return
-            second_return_expr = second_return_expr.replace(f'${let_var}', let_expr)
+            # Use word boundary to avoid partial matches
+            second_return_expr = re.sub(r'\$' + let_var + r'(?!\w)', let_expr, second_return_expr)
             
             # Create a simple sequence expression using the actual for variable name
             query = f'(for ${for_var} in {for_path} return {first_return_expr}, {second_return_expr})'
