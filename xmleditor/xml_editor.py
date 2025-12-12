@@ -11,7 +11,7 @@ from xmleditor.theme_manager import ThemeManager, ThemeType
 class XMLEditor(QsciScintilla):
     """XML editor with syntax highlighting and advanced features."""
     
-    def __init__(self, parent=None, theme_type=ThemeType.SYSTEM):
+    def __init__(self, parent=None, theme_type=ThemeType.SYSTEM, focus_callback=None):
         super().__init__(parent)
         
         # Set up the font
@@ -22,6 +22,7 @@ class XMLEditor(QsciScintilla):
         
         # Store theme type
         self.theme_type = theme_type
+        self._focus_callback = focus_callback
         
         # Set up line numbers
         fontmetrics = self.fontMetrics()
@@ -75,6 +76,12 @@ class XMLEditor(QsciScintilla):
         
         # Apply initial theme
         self.apply_theme(theme_type)
+    
+    def focusInEvent(self, event):
+        """Track focus to help main window know the active editor."""
+        super().focusInEvent(event)
+        if self._focus_callback:
+            self._focus_callback(self)
     
     def apply_theme(self, theme_type):
         """Apply a theme to the editor."""
