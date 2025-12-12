@@ -39,7 +39,7 @@ return
   <CountJobTitle> {$k} </CountJobTitle>
 
 }</Result_Example_XQuery>""",
-            4  # Expected: 3 titles + 1 count
+            1  # Expected: single XML wrapper containing titles and count
         ),
         (
             "XQuery with version declaration only",
@@ -102,6 +102,13 @@ return
                 print(f"    Result {i}: {result_str}")
             if len(results) > 3:
                 print(f"    ... and {len(results) - 3} more")
+            
+            if description == "Original problematic query from issue":
+                assert actual_count == 1, "Wrapper query should return a single XML string"
+                wrapped = results[0]
+                assert "<Result_Example_XQuery>" in wrapped, "Wrapper element should be preserved"
+                assert "<JobTitle>" in wrapped, "JobTitle elements should be rendered"
+                assert "<CountJobTitle>" in wrapped, "Count element should be rendered"
         else:
             print(f"✗ FAIL: {message}")
             failed += 1
