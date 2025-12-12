@@ -875,10 +875,12 @@ class MainWindow(QMainWindow):
         # Fallback to primary tab
         primary_editor = self.tab_widget.currentWidget()
         if isinstance(primary_editor, XMLEditor):
+            self.last_active_editor = primary_editor
             return primary_editor
         # Fallback to split view
         split_editor = self.split_tab_widget.currentWidget()
         if isinstance(split_editor, XMLEditor):
+            self.last_active_editor = split_editor
             return split_editor
         return None
     
@@ -907,9 +909,18 @@ class MainWindow(QMainWindow):
                 return tab_widget
             self.last_active_editor = None
         if self.split_tab_widget.count() == 0:
+            fallback_editor = self.tab_widget.currentWidget()
+            if isinstance(fallback_editor, XMLEditor):
+                self.last_active_editor = fallback_editor
             return self.tab_widget
         if self.tab_widget.count() == 0:
+            fallback_editor = self.split_tab_widget.currentWidget()
+            if isinstance(fallback_editor, XMLEditor):
+                self.last_active_editor = fallback_editor
             return self.split_tab_widget
+        fallback_editor = self.tab_widget.currentWidget()
+        if isinstance(fallback_editor, XMLEditor):
+            self.last_active_editor = fallback_editor
         return self.tab_widget
     
     def _get_data_store(self, tab_widget):
@@ -999,7 +1010,7 @@ class MainWindow(QMainWindow):
             self.split_tab_data = new_tab_data
             self._update_split_dock_visibility()
         
-        # If no tabs remain in either area, create a new one to keep editor usable
+        # If both areas are empty, create a new document in the primary area
         if self.tab_widget.count() == 0 and self.split_tab_widget.count() == 0:
             self.create_new_document()
     
@@ -1812,6 +1823,7 @@ class MainWindow(QMainWindow):
             title += " *"
         
         self.setWindowTitle(title)
+        # There are two editor regions: the primary tab widget and the split dock
         view_name = "Split" if self.get_active_tab_widget() is self.split_tab_widget else "Main"
         display_name = os.path.basename(file_path) if file_path else "Untitled"
         self.active_view_label.setText(f"{view_name}: {display_name}")
