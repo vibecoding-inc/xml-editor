@@ -185,22 +185,90 @@ This is automatically preprocessed to:
 (for $s in /path/to/element return $s/text(), count(/path/to/element))
 ```
 
-## XQuery Syntax Preprocessing
-To improve compatibility, the system automatically preprocesses XQuery expressions to convert unsupported syntax to XPath 3.0:
-- **XQuery version declarations** (`xquery version "1.0";`) are removed
-- **XQuery comments** (`(: comment :)`) are stripped
-- **doc() function calls** are replaced with direct path references
-- **Invalid FLWOR structures** (e.g., `let` after `return`) are converted to valid sequences
-- **Element construction** in FLWOR expressions is converted to text output
+## XQuery Syntax Preprocessing (Production-Ready)
+The system includes comprehensive, production-ready preprocessing that automatically converts XQuery syntax to XPath 3.0:
 
-This preprocessing allows many common XQuery patterns to work even though the underlying engine is XPath 3.0.
+### Declarations and Comments
+- **XQuery version declarations** (`xquery version "1.0";`, with optional encoding) are removed
+- **Namespace declarations** (`declare namespace ...`) are stripped
+- **XQuery comments** (`(: comment :)`) with support for colons inside comments
+- **Pragmas** (`(# pragma #)`) are removed
+- **Other declare statements** (boundary-space, ordering, etc.) are removed
+
+### Document Functions
+- **doc() function** calls are replaced with direct path references
+- **doc-available()** returns `true()` (assumes documents are available)
+- **collection()** returns empty sequence `()`
+
+### FLWOR Expressions
+- **for...return** - fully supported
+- **for...where...return** - `where` converted to predicate filters
+- **for...let...return** - `let` variables substituted inline
+- **for...let...where...return** - combined support with both let and where
+- **Multiple conditions** in where clauses with `and`/`or`
+- **Comma-separated** FLWOR sequences (e.g., `for...return..., let...return...`)
+
+### Element Construction
+- **Direct constructors** (`<tag>{expr}</tag>`) converted to text output
+- **Nested element construction** in FLWOR expressions
+- **Outer wrapper elements** removed when they wrap entire query
+
+### Path Expression Handling
+- **Attribute access** in where clauses: `$var/@attr` → `@attr`
+- **Child paths** in where clauses: `$var/child` → `./child`
+- **Variable references** with word boundary matching to avoid partial matches
+
+## Supported XQuery Patterns
+```xquery
+-- Version declarations (automatically removed)
+xquery version "1.0" encoding "UTF-8";
+
+-- Namespace declarations (automatically removed)
+declare namespace ex = "http://example.com";
+
+-- Comments (automatically removed)
+(: This is a comment with : colons :)
+
+-- FLWOR with where
+for $book in //book
+where $book/@price > 30
+return $book/title/text()
+
+-- FLWOR with let
+for $book in //book
+let $discount := $book/@price * 0.1
+return concat($book/title/text(), ' - Discount: $', $discount)
+
+-- FLWOR with let and where
+for $book in //book
+let $price := $book/@price
+where $price > 30 and $book/year = 2003
+return $book/title/text()
+
+-- Multiple conditions
+for $item in //item
+where $item/@status = 'active' and $item/quantity > 0
+return $item/name/text()
+
+-- Element construction
+for $book in //book
+where $book/@category = 'web'
+return <WebBook>{$book/title/text()}</WebBook>
+
+-- With doc() function (automatically converted)
+for $s in doc("data.xml")/path/to/element
+return $s/text()
+```
 
 ## Limitations
 - XPath 3.0 support only (not full XQuery 3.0)
-- Limited FLWOR support (no standalone `let`, `where`, `order by`, `group by`)
-- No XQuery modules or imports
+- No `order by` in FLWOR (sorting not supported)
+- No `group by` in FLWOR
+- No user-defined functions or modules
 - No schema-aware processing
-- Element construction is converted to text output
+- Element construction returns text output
+- No typeswitch expressions
+- Collection() function returns empty sequence
 
 ## Future Enhancements
 - Consider full XQuery 3.0 processor (e.g., Saxon/HE)
