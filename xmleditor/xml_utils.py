@@ -670,7 +670,7 @@ class XMLUtilities:
             Convert simple element constructors into string concatenations so they can be represented
             in XPath 3.0 execution results.
             """
-            element_pattern = r'<(?P<tag>[\w:-]+)[^>]*>\s*\{(?P<content>[^}]*)\}\s*</(?P=tag)>'
+            element_pattern = r'<(?P<tag>[\w:-]+)(?:\s+[^>]*?)?>\s*\{(?P<content>[^}]*)\}\s*</(?P=tag)>'
             def _repl(match: re.Match) -> str:
                 tag = match.group('tag')
                 content = match.group('content').strip()
@@ -786,11 +786,14 @@ class XMLUtilities:
                 r'(?:xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;\s*)?'  # Version declaration
                 r'(?:declare\s+[^\;]+;\s*)*'  # Declare statements
             )
-            wrapper_pattern = r'^\s*' + wrapper_prefix + r'<([\w:-]+)[^>]*>\s*\{(.*?)\}\s*</\1>\s*$'
+            wrapper_pattern = (
+                r'^\s*' + wrapper_prefix +
+                r'<(?P<tag>[\w:-]+)[^>]*>\s*\{(?P<body>[\s\S]*)\}\s*</(?P=tag)>\s*$'
+            )
             wrapper_match = re.match(wrapper_pattern, stripped_query, re.DOTALL | re.IGNORECASE)
             if wrapper_match:
-                wrapper_tag = wrapper_match.group(1)
-                inner_query = wrapper_match.group(2)
+                wrapper_tag = wrapper_match.group('tag')
+                inner_query = wrapper_match.group('body')
             
             # Preprocess XQuery to handle unsupported syntax
             processed_query = XMLUtilities.preprocess_xquery(inner_query)
