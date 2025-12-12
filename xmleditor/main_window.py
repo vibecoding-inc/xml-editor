@@ -866,8 +866,8 @@ class MainWindow(QMainWindow):
     
     def get_current_editor(self):
         """Get the currently active editor widget."""
-        if self.last_active_editor:
-            parent_widget = getattr(self.last_active_editor, 'parent_tab_widget', None)
+        if self.last_active_editor and hasattr(self.last_active_editor, 'parent_tab_widget'):
+            parent_widget = self.last_active_editor.parent_tab_widget
             if parent_widget and parent_widget.indexOf(self.last_active_editor) != -1:
                 return self.last_active_editor
         # Fallback to primary tab
@@ -899,15 +899,23 @@ class MainWindow(QMainWindow):
     
     def get_active_tab_widget(self):
         """Return the tab widget containing the last-focused editor."""
-        if self.last_active_editor:
-            tab_widget = getattr(self.last_active_editor, 'parent_tab_widget', None)
+        if self.last_active_editor and hasattr(self.last_active_editor, 'parent_tab_widget'):
+            tab_widget = self.last_active_editor.parent_tab_widget
             if tab_widget and tab_widget.indexOf(self.last_active_editor) != -1:
                 return tab_widget
-        return self.tab_widget if self.tab_widget.count() or not self.split_tab_widget.count() else self.split_tab_widget
+        if self.tab_widget.count() or not self.split_tab_widget.count():
+            return self.tab_widget
+        return self.split_tab_widget
     
     def _get_data_store(self, tab_widget):
         """Return the appropriate tab data store for the given widget."""
         return self.tab_data if tab_widget is self.tab_widget else self.split_tab_data
+    
+    def _update_split_dock_visibility(self):
+        """Hide the split dock when it has no tabs."""
+        if self.split_tab_widget.count() == 0:
+            self.split_dock.hide()
+            self.toggle_split_view_action.setChecked(False)
     
     def on_editor_focused(self, editor):
         """Track the last active editor for tool window actions."""
@@ -974,6 +982,7 @@ class MainWindow(QMainWindow):
             self.tab_data = new_tab_data
         else:
             self.split_tab_data = new_tab_data
+            self._update_split_dock_visibility()
         
         # If no tabs remain in either area, create a new one to keep editor usable
         if self.tab_widget.count() == 0 and self.split_tab_widget.count() == 0:
@@ -1658,8 +1667,6 @@ class MainWindow(QMainWindow):
     def move_tab_to_split_view(self):
         """Move the active tab between the main area and the split-view dock."""
         source_widget = self.get_active_tab_widget()
-        if not isinstance(source_widget, QTabWidget):
-            return
         index = source_widget.currentIndex()
         if index < 0:
             return
@@ -1682,9 +1689,7 @@ class MainWindow(QMainWindow):
             self.tab_data = new_src_data
         else:
             self.split_tab_data = new_src_data
-            if self.split_tab_widget.count() == 0:
-                self.split_dock.hide()
-                self.toggle_split_view_action.setChecked(False)
+            self._update_split_dock_visibility()
         
         # Show split dock if moving into it
         if dest_widget is self.split_tab_widget:
@@ -1796,10 +1801,9 @@ class MainWindow(QMainWindow):
                 title += " *"
         
         self.setWindowTitle(title)
-        if hasattr(self, 'active_view_label'):
-            view_name = "Split" if self.get_active_tab_widget() is self.split_tab_widget else "Main"
-            display_name = os.path.basename(tab_data.get('file_path')) if tab_data and tab_data.get('file_path') else "Untitled"
-            self.active_view_label.setText(f"{view_name}: {display_name}")
+        view_name = "Split" if self.get_active_tab_widget() is self.split_tab_widget else "Main"
+        display_name = os.path.basename(tab_data.get('file_path')) if tab_data and tab_data.get('file_path') else "Untitled"
+        self.active_view_label.setText(f"{view_name}: {display_name}")
         
     def check_save_changes(self):
         """Check if there are unsaved changes in any tab and prompt user."""
