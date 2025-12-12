@@ -23,6 +23,55 @@ def _strip_prelude(text: str) -> str:
     stripped = re.sub(r'declare\s+[^;]*;\s*', '', stripped, flags=re.IGNORECASE)
     return stripped.strip()
 
+def _to_concat_literal(text: str) -> str:
+    """Convert a literal string with {expr} placeholders into a concat() expression."""
+    parts: List[str] = []
+    buf: List[str] = []
+    depth = 0
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == '{':
+            if depth == 0 and buf:
+                literal = ''.join(buf)
+                parts.append('"' + literal.replace('"', '""') + '"')
+                buf = []
+            depth += 1
+            i += 1
+            continue
+        if ch == '}':
+            depth -= 1
+            if depth == 0:
+                expr = ''.join(buf).strip()
+                if expr:
+                    parts.append(expr)
+                buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    if buf:
+        literal = ''.join(buf)
+        parts.append('"' + literal.replace('"', '""') + '"')
+    if not parts:
+        return '""'
+    if len(parts) == 1:
+        return parts[0]
+    return "concat(" + ", ".join(parts) + ")"
+
+def _convert_element_constructors_generic(expr: str) -> str:
+    """
+    Convert element constructors (with nested content and {expr} placeholders)
+    into concat() expressions compatible with XPath 3.0 parsing.
+    """
+    element_pattern = re.compile(r'<(?P<tag>[\w:-]+)(?P<attrs>[^>]*)>(?P<body>.*?)</(?P=tag)>', re.DOTALL)
+    
+    def repl(match: re.Match) -> str:
+        raw = match.group(0)
+        return _to_concat_literal(raw)
+    
+    return element_pattern.sub(repl, expr)
+
 class XMLUtilities:
     """Utilities for XML operations."""
     
@@ -812,7 +861,15 @@ class XMLUtilities:
                         if not expr:
                             parts.append('')
                         else:
-                            processed = XMLUtilities.preprocess_xquery(expr)
+                            # Normalize multiple leading for-clauses into nested FLWOR
+                            if expr.lstrip().startswith('for ') and '\nfor ' in expr and 'return' in expr:
+                                second_for_idx = expr.find('\nfor ')
+                                if second_for_idx != -1:
+                                    expr = expr[:second_for_idx] + " return (" + expr[second_for_idx + 1:] + ")"
+                            
+                            # Also normalize element constructors to concat form for nested templates
+                            processed = _convert_element_constructors_generic(expr)
+                            processed = XMLUtilities.preprocess_xquery(processed)
                             query = parser.parse(processed.strip())
                             result = query.evaluate(context=context)
                             if result is None:
