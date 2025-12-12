@@ -906,9 +906,11 @@ class MainWindow(QMainWindow):
             if tab_widget and tab_widget.indexOf(self.last_active_editor) != -1:
                 return tab_widget
             self.last_active_editor = None
-        if self.tab_widget.count() or not self.split_tab_widget.count():
+        if self.split_tab_widget.count() == 0:
             return self.tab_widget
-        return self.split_tab_widget
+        if self.tab_widget.count() == 0:
+            return self.split_tab_widget
+        return self.tab_widget
     
     def _get_data_store(self, tab_widget):
         """Return the appropriate tab data store for the given widget."""
@@ -1060,7 +1062,9 @@ class MainWindow(QMainWindow):
                     tab_data = data_store.get(index, {})
                     if tab_data.get('file_path') == file_path:
                         widget.setCurrentIndex(index)
-                        self.last_active_editor = widget.widget(index)
+                        existing_editor = widget.widget(index)
+                        if isinstance(existing_editor, XMLEditor):
+                            self.last_active_editor = existing_editor
                         QMessageBox.information(self, "File Already Open", 
                                               f"The file {os.path.basename(file_path)} is already open.")
                         return
@@ -1795,9 +1799,9 @@ class MainWindow(QMainWindow):
         """Update window title based on current file and modified state."""
         title = "XML Editor"
         
-        tab_data = self.get_current_tab_data() or {}
-        file_path = tab_data.get('file_path')
-        is_modified = tab_data.get('is_modified', False)
+        tab_data = self.get_current_tab_data()
+        file_path = tab_data.get('file_path') if tab_data else None
+        is_modified = tab_data.get('is_modified', False) if tab_data else False
         
         if file_path:
             title += f" - {os.path.basename(file_path)}"
