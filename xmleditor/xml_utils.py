@@ -647,12 +647,20 @@ class XMLUtilities:
         query_stripped = query.strip()
         # Recursively remove element wrappers to handle nested structures
         while query_stripped.startswith('<') and query_stripped.endswith('>'):
+            # Try standard pattern: <Element>{...}</Element>
             outer_wrapper_match = re.match(r'^\s*<(\w+)[^>]*>\s*\{(.*)\}\s*</(\w+)>\s*$', query_stripped, re.DOTALL)
             if outer_wrapper_match and outer_wrapper_match.group(1) == outer_wrapper_match.group(3):
                 query = outer_wrapper_match.group(2)
                 query_stripped = query.strip()
             else:
-                break
+                # Try nested pattern without curly brace after first tag: <Outer><Inner>{...}</Inner></Outer>
+                nested_wrapper_match = re.match(r'^\s*<(\w+)[^>]*>\s*<(\w+)[^>]*>\s*\{(.*)\}\s*</(\2)>\s*</(\1)>\s*$', query_stripped, re.DOTALL)
+                if nested_wrapper_match and nested_wrapper_match.group(1) == nested_wrapper_match.group(5):
+                    # Remove both outer wrappers at once
+                    query = nested_wrapper_match.group(3)
+                    query_stripped = query.strip()
+                else:
+                    break
         
         # Step 8: Process FLWOR expressions
         query = XMLUtilities._process_flwor(query)
@@ -789,6 +797,14 @@ class XMLUtilities:
             if nested_match:
                 nested_elements.append(nested_match.group(1))
                 inner_content = nested_match.group(2)
+        else:
+            # Try pattern with nested elements without curly brace after first tag
+            # e.g., <Outer><Inner>{...}</Inner></Outer>
+            nested_wrapper_match = re.match(r'^\s*<(\w+)[^>]*>\s*<(\w+)[^>]*>\s*\{(.*)\}\s*</(\2)>\s*</(\1)>\s*$', query_no_comments, re.DOTALL)
+            if nested_wrapper_match and nested_wrapper_match.group(1) == nested_wrapper_match.group(5):
+                root_element = nested_wrapper_match.group(1)
+                nested_elements.append(nested_wrapper_match.group(2))
+                inner_content = nested_wrapper_match.group(3)
         
         # Extract element names and structure from return statements
         child_elements = []
