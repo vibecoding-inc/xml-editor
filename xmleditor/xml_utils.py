@@ -602,6 +602,64 @@ class XMLUtilities:
         return '\n'.join(lines)
     
     @staticmethod
+    def preprocess_xquery(xquery_string: str) -> str:
+        """
+        Preprocess XQuery to convert unsupported syntax to XPath 3.0.
+        
+        Args:
+            xquery_string: Raw XQuery expression
+            
+        Returns:
+            Preprocessed XPath 3.0 compatible expression
+        """
+        import re
+        
+        # Remove XQuery comments (: ... :)
+        query = re.sub(r'\(:[^:]*:\)', '', xquery_string)
+        
+        # Remove XQuery version declarations
+        query = re.sub(r'xquery\s+version\s+"[^"]*"\s*;', '', query, flags=re.IGNORECASE)
+        
+        # Remove element construction wrappers like <Result>{...}</Result>
+        # Extract content between outer element tags
+        element_wrapper_match = re.search(r'<[^>]+>\s*\{(.*)\}\s*</[^>]+>', query, re.DOTALL)
+        if element_wrapper_match:
+            query = element_wrapper_match.group(1)
+        
+        # Handle doc() function - remove it and keep the path
+        # doc("file.xml")/path -> /path
+        query = re.sub(r'doc\([^)]+\)', '', query)
+        
+        # Fix FLWOR expressions with comma after return followed by let
+        # This is invalid: "return expr, let $var := ..."
+        # Convert to sequence: "(expr1, expr2)"
+        
+        # Find patterns like: return ... , let ... return ...
+        flwor_pattern = r'for\s+\$\w+\s+in\s+([^\n]+)\s+return\s+([^,]+),\s*let\s+\$(\w+)\s*:=\s*([^\n]+)\s+return\s+(.+)'
+        flwor_match = re.search(flwor_pattern, query, re.DOTALL)
+        
+        if flwor_match:
+            # Extract the components
+            for_path = flwor_match.group(1).strip()
+            first_return_expr = flwor_match.group(2).strip()
+            let_var = flwor_match.group(3).strip()
+            let_expr = flwor_match.group(4).strip()
+            second_return_expr = flwor_match.group(5).strip()
+            
+            # Convert element construction to text if present
+            # <JobTitle> {$s/text()} </JobTitle> -> $s/text()
+            first_return_expr = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', first_return_expr)
+            second_return_expr = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', second_return_expr)
+            
+            # Replace $k with the actual expression
+            second_return_expr = second_return_expr.replace(f'${let_var}', let_expr)
+            
+            # Create a simple sequence expression
+            query = f'(for $s in {for_path} return {first_return_expr}, {second_return_expr})'
+        
+        return query.strip()
+    
+    @staticmethod
     def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List]:
         """
         Execute XQuery expression against XML document.
@@ -620,6 +678,9 @@ class XMLUtilities:
             return False, "XQuery support not available. Install 'elementpath' package.", []
         
         try:
+            # Preprocess XQuery to handle unsupported syntax
+            processed_query = XMLUtilities.preprocess_xquery(xquery_string)
+            
             # Parse XML
             tree = etree.fromstring(xml_string.encode('utf-8'))
             
@@ -627,7 +688,7 @@ class XMLUtilities:
             parser = XPath30Parser()
             
             # Parse and execute query
-            query = parser.parse(xquery_string.strip())
+            query = parser.parse(processed_query.strip())
             context = elementpath.XPathContext(tree)
             result = query.evaluate(context=context)
             
