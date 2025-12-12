@@ -937,6 +937,14 @@ class MainWindow(QMainWindow):
                 new_tab_data[i - 1] = data
         return new_tab_data
     
+    def _set_tab_data(self, tab_widget, new_tab_data):
+        """Apply updated tab data and keep split dock state in sync."""
+        if tab_widget is self.tab_widget:
+            self.tab_data = new_tab_data
+        else:
+            self.split_tab_data = new_tab_data
+            self._update_split_dock_visibility()
+    
     def _update_split_dock_visibility(self):
         """Hide the split dock when it has no tabs."""
         if self.split_tab_widget.count() == 0:
@@ -1004,11 +1012,7 @@ class MainWindow(QMainWindow):
         
         # Update tab_data dictionary (shift indices)
         new_tab_data = self._shift_tab_data_after_removal(data_store, index)
-        if tab_widget is self.tab_widget:
-            self.tab_data = new_tab_data
-        else:
-            self.split_tab_data = new_tab_data
-            self._update_split_dock_visibility()
+        self._set_tab_data(tab_widget, new_tab_data)
         
         # If both areas are empty, create a new document in the primary area
         if self.tab_widget.count() == 0 and self.split_tab_widget.count() == 0:
@@ -1708,11 +1712,7 @@ class MainWindow(QMainWindow):
         # Remove from source
         source_widget.removeTab(index)
         new_src_data = self._shift_tab_data_after_removal(data_store_src, index)
-        if source_widget is self.tab_widget:
-            self.tab_data = new_src_data
-        else:
-            self.split_tab_data = new_src_data
-            self._update_split_dock_visibility()
+        self._set_tab_data(source_widget, new_src_data)
         
         # Show split dock if moving into it
         if dest_widget is self.split_tab_widget:
@@ -1823,7 +1823,7 @@ class MainWindow(QMainWindow):
             title += " *"
         
         self.setWindowTitle(title)
-        # There are two editor regions: the primary tab widget and the split dock
+        # There are two editor regions: the primary tab widget and the split view dock
         view_name = "Split" if self.get_active_tab_widget() is self.split_tab_widget else "Main"
         display_name = os.path.basename(file_path) if file_path else "Untitled"
         self.active_view_label.setText(f"{view_name}: {display_name}")
