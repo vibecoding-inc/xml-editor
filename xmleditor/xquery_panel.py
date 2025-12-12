@@ -372,12 +372,11 @@ class XQueryPanel(QWidget):
             self.result_count_label.setText(f"{len(results)} result(s)")
             
             lines = []
-            for i, result in enumerate(results, 1):
+            for result in results:
                 result_str = str(result).strip()
-                # Limit display length for very long results
                 if len(result_str) > self.MAX_RESULT_DISPLAY_LENGTH:
                     result_str = result_str[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
-                lines.append(f"[{i}] {result_str}")
+                lines.append(result_str)
             
             self.result_display.setStyleSheet(
                 f"background-color: {theme.get_color('base')}; color: {theme.get_color('text')};"
