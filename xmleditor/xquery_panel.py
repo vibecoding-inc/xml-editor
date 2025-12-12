@@ -374,8 +374,6 @@ class XQueryPanel(QWidget):
             lines = []
             for result in results:
                 result_str = str(result).strip()
-                if len(result_str) > self.MAX_RESULT_DISPLAY_LENGTH:
-                    result_str = result_str[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
                 lines.append(result_str)
             
             self.result_display.setStyleSheet(
