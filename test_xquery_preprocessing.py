@@ -20,6 +20,9 @@ xml_content = """<?xml version="1.0" encoding="UTF-8"?>
     </job>
 </staffinfo>"""
 
+EXPECT_WRAPPER = True
+EXPECT_NO_WRAPPER = False
+
 def test_xquery_preprocessing():
     """Test various XQuery preprocessing scenarios."""
     
@@ -40,39 +43,39 @@ return
 
 }</Result_Example_XQuery>""",
             1,  # Expected: single XML wrapper containing titles and count
-            True,
+            EXPECT_WRAPPER,
         ),
         (
             "XQuery with version declaration only",
             """xquery version "1.0";
 //staffinfo/job/title/text()""",
             3,
-            False,
+            EXPECT_NO_WRAPPER,
         ),
         (
             "XQuery with comments",
             """(: This is a comment :)
 //staffinfo/job/title/text()""",
             3,
-            False,
+            EXPECT_NO_WRAPPER,
         ),
         (
             "XQuery with doc() function",
             """doc("staffinfo.xml")/staffinfo/job/title/text()""",
             3,
-            False,
+            EXPECT_NO_WRAPPER,
         ),
         (
             "Simple XPath (should pass through)",
             """//staffinfo/job/title/text()""",
             3,
-            False,
+            EXPECT_NO_WRAPPER,
         ),
         (
             "Count query",
             """count(//staffinfo/job/title)""",
             1,
-            False,
+            EXPECT_NO_WRAPPER,
         ),
     ]
     

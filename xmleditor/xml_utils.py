@@ -13,6 +13,8 @@ try:
 except ImportError:
     XQUERY_AVAILABLE = False
 
+BRACE_CONTENT_PATTERN = r'(?:[^{}]|\{[^{}]*\})*'
+
 
 class XMLUtilities:
     """Utilities for XML operations."""
@@ -670,7 +672,11 @@ class XMLUtilities:
             Convert simple element constructors into string concatenations so they can be represented
             in XPath 3.0 execution results.
             """
-            element_pattern = r'<(?P<tag>[\w:-]+)(?:\s+[^>]*)?>\s*\{(?P<content>(?:[^{}]|\{[^{}]*\})*)\}\s*</(?P=tag)>'
+            element_pattern = (
+                r'<(?P<tag>[\w:-]+)(?:\s+[^>]*)?>\s*\{(?P<content>'
+                + BRACE_CONTENT_PATTERN +
+                r')\}\s*</(?P=tag)>'
+            )
             def _repl(match: re.Match) -> str:
                 tag = match.group('tag')
                 content = match.group('content').strip()
@@ -788,7 +794,7 @@ class XMLUtilities:
             )
             wrapper_pattern = (
                 r'^\s*' + wrapper_prefix +
-                r'<(?P<tag>[\w:-]+)[^>]*>\s*\{(?P<body>(?:[^{}]|\{[^{}]*\})*)\}\s*</(?P=tag)>\s*$'
+                r'<(?P<tag>[\w:-]+)[^>]*>\s*\{(?P<body>' + BRACE_CONTENT_PATTERN + r')\}\s*</(?P=tag)>\s*$'
             )
             wrapper_match = re.match(wrapper_pattern, stripped_query, re.DOTALL | re.IGNORECASE)
             if wrapper_match:
