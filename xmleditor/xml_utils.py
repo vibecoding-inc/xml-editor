@@ -867,6 +867,9 @@ class XMLUtilities:
                                 if second_for_idx != -1:
                                     expr = expr[:second_for_idx] + " return (" + expr[second_for_idx + 1:] + ")"
                             
+                            # Normalize manager id comparisons to string form for doc-based lookups
+                            expr = re.sub(r'@id\s*=\s*(\./manager\b)', r'@id=string(\1)', expr)
+                            
                             # Also normalize element constructors to concat form for nested templates
                             processed = _convert_element_constructors_generic(expr)
                             processed = XMLUtilities.preprocess_xquery(processed)
