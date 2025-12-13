@@ -29,7 +29,7 @@ classifiers = [
 dependencies = [
     "lxml>=5.0.0",
     "pygments>=2.17.0",
-    "elementpath>=5.0.0",
+    "saxonche>=12.9.0",
 ]
 
 [project.optional-dependencies]

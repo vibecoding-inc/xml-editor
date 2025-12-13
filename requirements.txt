@@ -2,4 +2,4 @@ PyQt6>=6.6.0
 PyQt6-QScintilla>=2.14.0
 lxml>=5.0.0
 pygments>=2.17.0
-elementpath>=5.0.0
+saxonche>=12.9.0

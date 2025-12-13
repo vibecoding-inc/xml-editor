@@ -42,22 +42,14 @@ print("-" * 80)
 print(problematic_xquery)
 print("-" * 80)
 
-print("\nPreprocessed XQuery (what gets executed):")
-print("-" * 80)
-preprocessed = XMLUtilities.preprocess_xquery(problematic_xquery)
-print(preprocessed)
-print("-" * 80)
-
 print("\nExecution Results:")
 print("-" * 80)
-success, message, results = XMLUtilities.execute_xquery(xml_content, problematic_xquery)
+success, message, result_xml = XMLUtilities.execute_xquery(xml_content, problematic_xquery)
 
 if success:
     print(f"✓ SUCCESS: {message}")
-    print("\nResults:")
-    for i, result in enumerate(results, 1):
-        result_str = result.strip() if isinstance(result, str) else str(result)
-        print(f"  {i}. {result_str}")
+    print("\nResults (as XML document):")
+    print(result_xml.strip())
 else:
     print(f"✗ FAILED: {message}")
 

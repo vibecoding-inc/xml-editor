@@ -7,8 +7,7 @@ import xml.dom.minidom
 import re
 from typing import Optional, List, Tuple
 try:
-    from elementpath.xpath30 import XPath30Parser
-    import elementpath
+    from saxonche import PySaxonProcessor
     XQUERY_AVAILABLE = True
 except ImportError:
     XQUERY_AVAILABLE = False
@@ -747,67 +746,96 @@ class XMLUtilities:
         return query
     
     @staticmethod
-    def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List]:
+    def _extract_xquery_fragments(xquery_string: str) -> List[str]:
         """
-        Execute XQuery expression against XML document.
+        Extract one or more XQuery fragments from the provided string.
+        
+        If the string is an XML container with <xquery> or <query> child
+        elements, each child's text content is treated as a fragment. Otherwise
+        the raw string is used as a single fragment.
+        """
+        fragments: List[str] = []
+        
+        try:
+            container = etree.fromstring(xquery_string.encode('utf-8'))
+            fragment_nodes = container.findall('.//xquery') + container.findall('.//query')
+            for node in fragment_nodes:
+                if node.text and node.text.strip():
+                    fragments.append(node.text.strip())
+        except etree.XMLSyntaxError:
+            # Not an XML container - treat as raw query text
+            pass
+        
+        if not fragments and xquery_string.strip():
+            fragments.append(xquery_string.strip())
+        
+        return fragments
+    
+    @staticmethod
+    def _append_result_fragment(results_root: etree._Element, serialized: str, index: int) -> None:
+        """
+        Append a serialized XQuery result to the aggregated XML document.
+        """
+        result_el = etree.SubElement(results_root, "result", index=str(index))
+        if not serialized:
+            return
+        
+        # Remove XML declaration if present to allow embedding
+        cleaned = re.sub(r'^<\?xml[^>]*?>', '', serialized.strip()).strip()
+        
+        try:
+            # Wrap to allow multiple top-level nodes
+            wrapper = etree.fromstring(f"<wrapper>{cleaned}</wrapper>".encode('utf-8'))
+            if wrapper.text and wrapper.text.strip():
+                result_el.text = wrapper.text.strip()
+            for child in wrapper:
+                result_el.append(child)
+        except Exception:
+            # Fallback to plain text if parsing fails
+            result_el.text = cleaned
+    
+    @staticmethod
+    def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, str]:
+        """
+        Execute XQuery expression(s) against an XML document using Saxon/C.
         
         Args:
             xml_string: XML content as string
-            xquery_string: XQuery expression (XPath 3.0 syntax)
+            xquery_string: XQuery expression or XML container with fragments
             
         Returns:
-            Tuple of (success, message, results)
+            Tuple of (success, message, result_xml)
             - success: True if execution succeeded
             - message: Success or error message
-            - results: List of result items
+            - result_xml: Serialized XML document containing query results
         """
         if not XQUERY_AVAILABLE:
-            return False, "XQuery support not available. Install 'elementpath' package.", []
+            return False, "XQuery support not available. Install 'saxonche' package.", ""
         
         try:
-            # Preprocess XQuery to handle unsupported syntax
-            processed_query = XMLUtilities.preprocess_xquery(xquery_string)
+            fragments = XMLUtilities._extract_xquery_fragments(xquery_string)
+            if not fragments:
+                return False, "No XQuery fragments provided", ""
             
-            # Parse XML
-            tree = etree.fromstring(xml_string.encode('utf-8'))
-            
-            # Create XPath 3.0 parser (supports XQuery-like syntax)
-            parser = XPath30Parser()
-            
-            # Parse and execute query
-            query = parser.parse(processed_query.strip())
-            context = elementpath.XPathContext(tree)
-            result = query.evaluate(context=context)
-            
-            # Convert result to list
-            if result is None:
-                result_list = []
-            elif isinstance(result, (list, tuple)):
-                result_list = list(result)
-            elif hasattr(result, '__iter__') and not isinstance(result, str):
-                result_list = list(result)
-            else:
-                result_list = [result]
-            
-            # Format results for display
-            formatted_results = []
-            for item in result_list:
-                if hasattr(item, 'elem'):
-                    # ElementNode - convert to string
-                    elem = item.elem
-                    formatted_results.append(etree.tostring(elem, encoding='unicode', pretty_print=True))
-                elif isinstance(item, str):
-                    formatted_results.append(item)
-                elif hasattr(item, 'value'):
-                    # TextNode or other node with value
-                    formatted_results.append(str(item.value))
-                else:
-                    formatted_results.append(str(item))
-            
-            if not formatted_results:
-                return True, "Query executed successfully (empty result)", []
-            
-            return True, f"Query executed successfully ({len(formatted_results)} result(s))", formatted_results
-            
+            with PySaxonProcessor(license=False) as processor:
+                source_doc = processor.parse_xml(xml_text=xml_string)
+                results_root = etree.Element("xqueryResults", fragments=str(len(fragments)))
+                
+                for idx, fragment in enumerate(fragments, 1):
+                    xquery_proc = processor.new_xquery_processor()
+                    xquery_proc.set_context(xdm_item=source_doc)
+                    xquery_proc.set_query_content(fragment)
+                    serialized = xquery_proc.run_query_to_string()
+                    XMLUtilities._append_result_fragment(results_root, serialized, idx)
+                
+                result_xml = etree.tostring(
+                    results_root,
+                    encoding='utf-8',
+                    pretty_print=True,
+                    xml_declaration=True
+                ).decode('utf-8')
+                
+                return True, f"Executed {len(fragments)} fragment(s) successfully", result_xml
+                
         except Exception as e:
-            return False, f"XQuery execution error: {str(e)}", []
+            return False, f"XQuery execution error: {str(e)}", ""

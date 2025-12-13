@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.Qsci import QsciScintilla
+from lxml import etree
 from xmleditor.xml_utils import XMLUtilities
 from xmleditor.theme_manager import ThemeManager, ThemeType
 
@@ -343,10 +344,10 @@ class XQueryPanel(QWidget):
             return
         
         # Execute the query
-        success, message, results = XMLUtilities.execute_xquery(xml_content, xquery)
+        success, message, result_xml = XMLUtilities.execute_xquery(xml_content, xquery)
         
         if success:
-            self.show_results(message, results)
+            self.show_results(message, result_xml)
         else:
             self.show_error(message)
     
@@ -362,34 +363,34 @@ class XQueryPanel(QWidget):
         item.setForeground(QColor(theme.get_color('red')))
         self.result_list.addItem(item)
     
-    def show_results(self, message, results):
+    def show_results(self, message, result_xml: str):
         """Display query results."""
         theme = ThemeManager.get_theme(self.theme_type)
         
-        if results:
-            self.status_label.setText("Success")
-            self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('green')};")
-            self.result_count_label.setText(f"{len(results)} result(s)")
-            
-            self.result_list.clear()
-            for i, result in enumerate(results, 1):
-                result_str = str(result).strip()
-                # Limit display length for very long results
-                if len(result_str) > self.MAX_RESULT_DISPLAY_LENGTH:
-                    result_str = result_str[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
-                
-                item = QListWidgetItem(f"[{i}] {result_str}")
-                item.setForeground(QColor(theme.get_color('text')))
-                self.result_list.addItem(item)
+        pretty_result = result_xml.strip()
+        fragment_count = "1"
+        
+        try:
+            result_tree = etree.fromstring(result_xml.encode('utf-8'))
+            fragments = result_tree.findall('./result')
+            fragment_count = str(len(fragments))
+            pretty_result = etree.tostring(result_tree, encoding='unicode', pretty_print=True)
+        except Exception:
+            pass
+        
+        self.status_label.setText("Success")
+        self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('green')};")
+        self.result_count_label.setText(f"{fragment_count} fragment(s)")
+        
+        self.result_list.clear()
+        if len(pretty_result) > self.MAX_RESULT_DISPLAY_LENGTH:
+            display_text = pretty_result[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
         else:
-            self.status_label.setText("Success")
-            self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('blue')};")
-            self.result_count_label.setText("0 results")
-            
-            self.result_list.clear()
-            item = QListWidgetItem("ℹ️ Query executed successfully (empty result)")
-            item.setForeground(QColor(theme.get_color('blue')))
-            self.result_list.addItem(item)
+            display_text = pretty_result
+        
+        item = QListWidgetItem(display_text)
+        item.setForeground(QColor(theme.get_color('text')))
+        self.result_list.addItem(item)
     
     def apply_theme(self, theme_type):
         """Apply theme to the panel."""
