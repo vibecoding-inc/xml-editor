@@ -3,10 +3,12 @@ XML utilities for parsing, validating, and manipulating XML documents.
 """
 
 from lxml import etree
+import os
 import xml.dom.minidom
 import re
 from typing import Optional, List, Tuple
 try:
+    # Only needed for XPath helpers in this module; XQuery is delegated to xquery_engine
     from elementpath.xpath30 import XPath30Parser
     import elementpath
     XQUERY_AVAILABLE = True
@@ -696,10 +698,10 @@ class XMLUtilities:
         # Step 5: Remove other declare statements (boundary-space, ordering, etc.)
         query = re.sub(r'declare\s+\w+(?:\s+\w+)*\s*;', '', query, flags=re.IGNORECASE)
         
-        # Step 6: Handle doc() and related functions
-        query = re.sub(r'doc-available\([^)]+\)', 'true()', query)  # Assume doc is available
-        query = re.sub(r'doc\([^)]+\)', '', query)  # Remove doc() calls
-        query = re.sub(r'collection\([^)]+\)', '()', query)  # Empty sequence for collection
+        # Step 6: Handle doc-available() only here. Do NOT strip doc()/collection() anymore.
+        # doc-available() is resolved optimistically during preprocessing for compatibility with
+        # existing tests and typical editor usage.
+        query = re.sub(r'doc-available\([^)]+\)', 'true()', query)
         
         # Step 7: Remove outer element wrapper if present
         query_stripped = query.strip()
@@ -867,9 +869,6 @@ class XMLUtilities:
                                 if second_for_idx != -1:
                                     expr = expr[:second_for_idx] + " return (" + expr[second_for_idx + 1:] + ")"
                             
-                            # Normalize manager id comparisons to string form for doc-based lookups
-                            expr = re.sub(r'@id\s*=\s*(\./manager\b)', r'@id=string(\1)', expr)
-                            
                             # Also normalize element constructors to concat form for nested templates
                             processed = _convert_element_constructors_generic(expr)
                             processed = XMLUtilities.preprocess_xquery(processed)
@@ -916,98 +915,78 @@ class XMLUtilities:
         return True, f"Query executed successfully (1 result(s))", [rendered_output.strip()]
     
     @staticmethod
+    def _resolve_external_resources(query: str) -> Tuple[str, dict]:
+        """
+        Resolve XQuery/XPath external resource calls like doc() and collection().
+        - doc("path") is replaced with a bound variable (e.g., $__doc_0), and the variable is
+          mapped to the parsed root element of the resolved XML document.
+        - collection() currently resolves to empty sequence ().
+        Returns the transformed query and a variables mapping for XPathContext.
+        Security: restricts resolution to current working directory and the project's samples/ folder.
+        """
+        variables: dict = {}
+        doc_var_index = 0
+
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        samples_dir = os.path.join(project_root, 'samples')
+        cwd = os.getcwd()
+
+        def is_allowed(path: str) -> bool:
+            ap = os.path.abspath(path)
+            return ap.startswith(cwd + os.sep) or ap.startswith(samples_dir + os.sep) or ap == cwd or ap == samples_dir
+
+        # Resolve doc('...') occurrences
+        doc_pattern = re.compile(r'doc\(\s*([\"\"])\s*(.*?)\s*\1\s*\)')
+
+        def resolve_doc(m: re.Match) -> str:
+            nonlocal doc_var_index
+            raw_path = m.group(2).strip()
+            candidate_paths = []
+            # Absolute or relative as provided
+            candidate_paths.append(raw_path)
+            # If just a basename, try under samples/
+            if not os.path.isabs(raw_path) and os.path.dirname(raw_path) == '':
+                candidate_paths.append(os.path.join(samples_dir, raw_path))
+                candidate_paths.append(os.path.join(cwd, raw_path))
+            # Also try relative to CWD and samples when a relative subpath was given
+            if not os.path.isabs(raw_path):
+                candidate_paths.append(os.path.join(cwd, raw_path))
+                candidate_paths.append(os.path.join(samples_dir, raw_path))
+
+            resolved = None
+            for p in candidate_paths:
+                if os.path.exists(p) and is_allowed(p):
+                    resolved = p
+                    break
+            if resolved is None:
+                # Unresolvable doc() -> empty sequence
+                return '()'
+            try:
+                with open(resolved, 'r', encoding='utf-8') as f:
+                    xml_text = f.read()
+                root = etree.fromstring(xml_text.encode('utf-8'))
+                var_name = f'__doc_{doc_var_index}'
+                variables[var_name] = root
+                doc_var_index += 1
+                return f'$${var_name}'
+            except Exception:
+                return '()'
+
+        query = doc_pattern.sub(resolve_doc, query)
+
+        # Resolve collection('...') as empty sequence for now
+        coll_pattern = re.compile(r'collection\(\s*([\"\"])\s*.*?\s*\1\s*\)')
+        query = coll_pattern.sub('()', query)
+
+        return query, {k: v for k, v in variables.items()}
+    
+    @staticmethod
     def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List]:
         """
-        Execute XQuery expression against XML document.
-        
-        Args:
-            xml_string: XML content as string
-            xquery_string: XQuery expression (XPath 3.0 syntax)
-            
-        Returns:
-            Tuple of (success, message, results)
-            - success: True if execution succeeded
-            - message: Success or error message
-            - results: List of result items
+        Execute XQuery expression or template against XML document.
+
+        This delegates to the dedicated xquery_engine (template-first, spec-aligned
+        renderer). It keeps the public API stable for tests and callers.
         """
-        if not XQUERY_AVAILABLE:
-            return False, "XQuery support not available. Install 'elementpath' package.", []
-        
-        try:
-            # If the query looks like an XML template with embedded expressions, render it directly
-            stripped_query = xquery_string.strip()
-            prelude_stripped = _strip_prelude(stripped_query)
-            if prelude_stripped.startswith('<') and '{' in prelude_stripped and '}' in prelude_stripped:
-                success, message, results = XMLUtilities._render_template_query(xml_string, xquery_string)
-                if success:
-                    return success, message, results
-                # Fall through to standard path on failure
-            
-            # Detect outer element wrapper to reconstruct structured output after execution
-            wrapper_tag = None
-            inner_query = xquery_string
-            wrapper_prefix = (
-                r'(?:\(:.*?:\)\s*)*'  # Leading XQuery comments
-                r'(?:xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;\s*)?'  # Version declaration
-                r'(?:declare\s+[^;]*;\s*)*'  # Declare statements
-            )
-            wrapper_pattern = (
-                r'^\s*' + wrapper_prefix +
-                r'<(?P<tag>[\w:-]+)[^>]*>\s*\{(?P<body>' + BRACE_CONTENT_PATTERN + r')\}\s*</(?P=tag)>\s*$'
-            )
-            wrapper_match = re.match(wrapper_pattern, stripped_query, re.DOTALL | re.IGNORECASE)
-            if wrapper_match:
-                wrapper_tag = wrapper_match.group('tag')
-                inner_query = wrapper_match.group('body')
-            
-            # Preprocess XQuery to handle unsupported syntax
-            processed_query = XMLUtilities.preprocess_xquery(inner_query)
-            
-            # Parse XML
-            tree = etree.fromstring(xml_string.encode('utf-8'))
-            
-            # Create XPath 3.0 parser (supports XQuery-like syntax)
-            parser = XPath30Parser()
-            
-            # Parse and execute query
-            query = parser.parse(processed_query.strip())
-            context = elementpath.XPathContext(tree)
-            result = query.evaluate(context=context)
-            
-            # Convert result to list
-            if result is None:
-                result_list = []
-            elif isinstance(result, (list, tuple)):
-                result_list = list(result)
-            elif hasattr(result, '__iter__') and not isinstance(result, str):
-                result_list = list(result)
-            else:
-                result_list = [result]
-            
-            # Format results for display
-            formatted_results = []
-            for item in result_list:
-                if hasattr(item, 'elem'):
-                    # ElementNode - convert to string
-                    elem = item.elem
-                    formatted_results.append(etree.tostring(elem, encoding='unicode', pretty_print=True))
-                elif isinstance(item, str):
-                    formatted_results.append(item)
-                elif hasattr(item, 'value'):
-                    # TextNode or other node with value
-                    formatted_results.append(str(item.value))
-                else:
-                    formatted_results.append(str(item))
-            
-            # If the query was wrapped in an element constructor, rebuild the structured XML output
-            if wrapper_tag is not None:
-                wrapped_content = ''.join(formatted_results)
-                formatted_results = [f"<{wrapper_tag}>{wrapped_content}</{wrapper_tag}>"]
-            
-            if not formatted_results:
-                return True, "Query executed successfully (empty result)", []
-            
-            return True, f"Query executed successfully ({len(formatted_results)} result(s))", formatted_results
-            
-        except Exception as e:
-            return False, f"XQuery execution error: {str(e)}", []
+        from .xquery_engine import execute_xquery as _engine_execute
+        return _engine_execute(xml_string, xquery_string)
