@@ -24,6 +24,18 @@ xml_content = """<?xml version="1.0" encoding="UTF-8"?>
 EXPECT_WRAPPER = True
 EXPECT_NO_WRAPPER = False
 
+def _samples_dir():
+    # Find samples directory from tests/ upward
+    here = os.path.dirname(__file__)
+    for _ in range(4):
+        cand = os.path.abspath(os.path.join(here, 'samples'))
+        if os.path.isdir(cand):
+            return cand
+        here = os.path.abspath(os.path.join(here, os.pardir))
+    # Fallback to project-root/samples
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, 'samples'))
+
+
 def test_xquery_preprocessing():
     """Test various XQuery preprocessing scenarios."""
     
@@ -86,7 +98,7 @@ return
     passed = 0
     failed = 0
     
-    samples_dir = os.path.join(os.path.dirname(__file__), 'samples')
+    samples_dir = _samples_dir()
 
     for description, query, expected_count, expect_wrapper in test_cases:
         print(f"\n{description}")
@@ -134,6 +146,7 @@ return
     
     return failed == 0
 
+
 def test_preprocessing_function():
     """Test the preprocessing function directly."""
     
@@ -171,14 +184,3 @@ def test_preprocessing_function():
             print("  ✗ FAIL")
     
     print("\n" + "=" * 80)
-
-if __name__ == "__main__":
-    success = test_xquery_preprocessing()
-    test_preprocessing_function()
-    
-    if success:
-        print("\n✓ All tests passed!")
-        exit(0)
-    else:
-        print("\n✗ Some tests failed!")
-        exit(1)

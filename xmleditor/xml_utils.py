@@ -981,7 +981,7 @@ class XMLUtilities:
         return query, {k: v for k, v in variables.items()}
     
     @staticmethod
-    def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List]:
+    def execute_xquery(xml_string: str, xquery_string: str, working_dir: Optional[str] = None) -> Tuple[bool, str, List]:
         """
         Execute XQuery expression or template against XML document.
 
@@ -989,4 +989,4 @@ class XMLUtilities:
         renderer). It keeps the public API stable for tests and callers.
         """
         from .xquery_engine import execute_xquery as _engine_execute
-        return _engine_execute(xml_string, xquery_string)
+        return _engine_execute(xml_string, xquery_string, working_dir)

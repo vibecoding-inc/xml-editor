@@ -3,6 +3,7 @@
 Demonstration that the problematic XQuery from the issue now works.
 """
 
+import os
 from xmleditor.xml_utils import XMLUtilities
 
 # Sample XML that matches the query structure
@@ -50,7 +51,8 @@ print("-" * 80)
 
 print("\nExecution Results:")
 print("-" * 80)
-success, message, results = XMLUtilities.execute_xquery(xml_content, problematic_xquery)
+samples_dir = os.path.join(os.path.dirname(__file__), 'samples')
+success, message, results = XMLUtilities.execute_xquery(xml_content, problematic_xquery, working_dir=samples_dir)
 
 if success:
     print(f"✓ SUCCESS: {message}")

@@ -8,13 +8,19 @@ import os
 from xmleditor.xml_utils import XMLUtilities
 
 
-def samples_dir():
-    project_root = os.path.dirname(__file__)
-    return os.path.join(project_root, 'samples')
+def _samples_dir():
+    # Find samples directory from tests/ upward
+    here = os.path.dirname(__file__)
+    for _ in range(4):
+        cand = os.path.abspath(os.path.join(here, 'samples'))
+        if os.path.isdir(cand):
+            return cand
+        here = os.path.abspath(os.path.join(here, os.pardir))
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, 'samples'))
 
 
 def load_sample(path):
-    sd = samples_dir()
+    sd = _samples_dir()
     with open(os.path.join(sd, path), 'r', encoding='utf-8') as f:
         return f.read()
 
@@ -23,7 +29,7 @@ def test_doc_function_staffinfo_titles():
     xml = load_sample('staffinfo.xml')
     # Query titles via doc() referencing the sample by basename
     query = 'for $s in doc("staffinfo.xml")/staffinfo/job/title return $s/text()'
-    ok, msg, results = XMLUtilities.execute_xquery(xml, query, working_dir=samples_dir())
+    ok, msg, results = XMLUtilities.execute_xquery(xml, query, working_dir=_samples_dir())
     assert ok, msg
     # Ensure we got many titles and the first is President (sample ordering)
     assert len(results) >= 1
