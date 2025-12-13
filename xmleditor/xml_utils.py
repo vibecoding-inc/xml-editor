@@ -3,16 +3,76 @@ XML utilities for parsing, validating, and manipulating XML documents.
 """
 
 from lxml import etree
+import os
 import xml.dom.minidom
 import re
 from typing import Optional, List, Tuple
 try:
+    # Only needed for XPath helpers in this module; XQuery is delegated to xquery_engine
     from elementpath.xpath30 import XPath30Parser
     import elementpath
     XQUERY_AVAILABLE = True
 except ImportError:
     XQUERY_AVAILABLE = False
 
+BRACE_CONTENT_PATTERN = r'(?:[^{}]|\{[^{}]*\})*'
+
+def _strip_prelude(text: str) -> str:
+    """Remove comments, pragmas, version and declare prelude from XQuery/XPath text."""
+    stripped = re.sub(r'\(:.*?:\)', '', text, flags=re.DOTALL)
+    stripped = re.sub(r'\(#.*?#\)', '', stripped, flags=re.DOTALL)
+    stripped = re.sub(r'xquery\s+version\s+"[^"]*"(?:\s+encoding\s+"[^"]*")?\s*;\s*', '', stripped, flags=re.IGNORECASE)
+    stripped = re.sub(r'declare\s+[^;]*;\s*', '', stripped, flags=re.IGNORECASE)
+    return stripped.strip()
+
+def _to_concat_literal(text: str) -> str:
+    """Convert a literal string with {expr} placeholders into a concat() expression."""
+    parts: List[str] = []
+    buf: List[str] = []
+    depth = 0
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == '{':
+            if depth == 0 and buf:
+                literal = ''.join(buf)
+                parts.append('"' + literal.replace('"', '""') + '"')
+                buf = []
+            depth += 1
+            i += 1
+            continue
+        if ch == '}':
+            depth -= 1
+            if depth == 0:
+                expr = ''.join(buf).strip()
+                if expr:
+                    parts.append(expr)
+                buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    if buf:
+        literal = ''.join(buf)
+        parts.append('"' + literal.replace('"', '""') + '"')
+    if not parts:
+        return '""'
+    if len(parts) == 1:
+        return parts[0]
+    return "concat(" + ", ".join(parts) + ")"
+
+def _convert_element_constructors_generic(expr: str) -> str:
+    """
+    Convert element constructors (with nested content and {expr} placeholders)
+    into concat() expressions compatible with XPath 3.0 parsing.
+    """
+    element_pattern = re.compile(r'<(?P<tag>[\w:-]+)(?P<attrs>[^>]*)>(?P<body>.*?)</(?P=tag)>', re.DOTALL)
+    
+    def repl(match: re.Match) -> str:
+        raw = match.group(0)
+        return _to_concat_literal(raw)
+    
+    return element_pattern.sub(repl, expr)
 
 class XMLUtilities:
     """Utilities for XML operations."""
@@ -638,10 +698,10 @@ class XMLUtilities:
         # Step 5: Remove other declare statements (boundary-space, ordering, etc.)
         query = re.sub(r'declare\s+\w+(?:\s+\w+)*\s*;', '', query, flags=re.IGNORECASE)
         
-        # Step 6: Handle doc() and related functions
-        query = re.sub(r'doc-available\([^)]+\)', 'true()', query)  # Assume doc is available
-        query = re.sub(r'doc\([^)]+\)', '', query)  # Remove doc() calls
-        query = re.sub(r'collection\([^)]+\)', '()', query)  # Empty sequence for collection
+        # Step 6: Handle doc-available() only here. Do NOT strip doc()/collection() anymore.
+        # doc-available() is resolved optimistically during preprocessing for compatibility with
+        # existing tests and typical editor usage.
+        query = re.sub(r'doc-available\([^)]+\)', 'true()', query)
         
         # Step 7: Remove outer element wrapper if present
         query_stripped = query.strip()
@@ -665,6 +725,22 @@ class XMLUtilities:
         - Multiple for/let clauses
         - Nested FLWOR
         """
+        def convert_element_constructors(expr: str) -> str:
+            """
+            Convert simple element constructors into string concatenations so they can be represented
+            in XPath 3.0 execution results.
+            """
+            element_pattern = (
+                r'<(?P<tag>[\w:-]+)(?:\s+[^>]*)?>\s*\{(?P<content>'
+                + BRACE_CONTENT_PATTERN +
+                r')\}\s*</(?P=tag)>'
+            )
+            def _repl(match: re.Match) -> str:
+                tag = match.group('tag')
+                content = match.group('content').strip()
+                return f'concat("<{tag}>", {content}, "</{tag}>")'
+            
+            return re.sub(element_pattern, _repl, expr)
         # Pattern 1: for...let...where...order by...return
         # Most complex FLWOR pattern
         full_flwor = r'for\s+\$(?P<for_var>\w+)\s+in\s+(?P<for_path>[^\r\n]+?)(?:\s+let\s+\$(?P<let_var>\w+)\s*:=\s*(?P<let_expr>[^\r\n]+?))?(?:\s+where\s+(?P<where_cond>[^\r\n]+?))?(?:\s+order\s+by\s+(?P<order_expr>[^\r\n]+?))?(?:\s+return\s+(?P<return_expr>.+))'
@@ -679,8 +755,8 @@ class XMLUtilities:
             order_expr = match.group('order_expr')
             return_expr = match.group('return_expr').strip()
             
-            # Remove element construction from return expression
-            return_expr = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', return_expr)
+            # Convert element construction in return expression to string form
+            return_expr = convert_element_constructors(return_expr)
             
             # Build the converted expression
             converted = f'for ${for_var} in {for_path}'
@@ -732,9 +808,9 @@ class XMLUtilities:
             let_expr = match.group('let_expr').strip()
             second_return = match.group('second_return').strip()
             
-            # Remove element construction
-            first_return = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', first_return)
-            second_return = re.sub(r'<[^>]+>\s*\{([^}]+)\}\s*</[^>]+>', r'\1', second_return)
+            # Convert element construction to string representations
+            first_return = convert_element_constructors(first_return)
+            second_return = convert_element_constructors(second_return)
             
             # Substitute let variable with escaped pattern to prevent ReDoS
             let_var_escaped = re.escape(let_var)
@@ -747,67 +823,170 @@ class XMLUtilities:
         return query
     
     @staticmethod
-    def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List]:
+    def _render_template_query(xml_string: str, xquery_string: str) -> Tuple[bool, str, List[str]]:
         """
-        Execute XQuery expression against XML document.
-        
-        Args:
-            xml_string: XML content as string
-            xquery_string: XQuery expression (XPath 3.0 syntax)
-            
-        Returns:
-            Tuple of (success, message, results)
-            - success: True if execution succeeded
-            - message: Success or error message
-            - results: List of result items
+        Render an XQuery template that mixes literal XML/text with enclosed expressions { ... }.
+        Each enclosed expression is preprocessed and evaluated, and the result is interpolated
+        into the final output.
         """
-        if not XQUERY_AVAILABLE:
-            return False, "XQuery support not available. Install 'elementpath' package.", []
+        # Strip leading comments/pragmas/version/declare statements
+        template = _strip_prelude(xquery_string)
         
-        try:
-            # Preprocess XQuery to handle unsupported syntax
-            processed_query = XMLUtilities.preprocess_xquery(xquery_string)
-            
-            # Parse XML
-            tree = etree.fromstring(xml_string.encode('utf-8'))
-            
-            # Create XPath 3.0 parser (supports XQuery-like syntax)
-            parser = XPath30Parser()
-            
-            # Parse and execute query
-            query = parser.parse(processed_query.strip())
-            context = elementpath.XPathContext(tree)
-            result = query.evaluate(context=context)
-            
-            # Convert result to list
-            if result is None:
-                result_list = []
-            elif isinstance(result, (list, tuple)):
-                result_list = list(result)
-            elif hasattr(result, '__iter__') and not isinstance(result, str):
-                result_list = list(result)
-            else:
-                result_list = [result]
-            
-            # Format results for display
-            formatted_results = []
-            for item in result_list:
-                if hasattr(item, 'elem'):
-                    # ElementNode - convert to string
-                    elem = item.elem
-                    formatted_results.append(etree.tostring(elem, encoding='unicode', pretty_print=True))
-                elif isinstance(item, str):
-                    formatted_results.append(item)
-                elif hasattr(item, 'value'):
-                    # TextNode or other node with value
-                    formatted_results.append(str(item.value))
+        tree = etree.fromstring(xml_string.encode('utf-8'))
+        parser = XPath30Parser()
+        context = elementpath.XPathContext(tree)
+        
+        parts: List[str] = []
+        literal_buf: List[str] = []
+        expr_buf: List[str] = []
+        expr_depth = 0
+        i = 0
+        while i < len(template):
+            ch = template[i]
+            if expr_depth == 0 and ch == '{':
+                # Flush literal buffer
+                if literal_buf:
+                    parts.append(''.join(literal_buf))
+                    literal_buf = []
+                expr_depth = 1
+                expr_buf = []
+                i += 1
+                continue
+            elif expr_depth > 0:
+                if ch == '{':
+                    expr_depth += 1
+                    expr_buf.append(ch)
+                elif ch == '}':
+                    expr_depth -= 1
+                    if expr_depth == 0:
+                        expr = ''.join(expr_buf).strip()
+                        if not expr:
+                            parts.append('')
+                        else:
+                            # Normalize multiple leading for-clauses into nested FLWOR
+                            if expr.lstrip().startswith('for ') and '\nfor ' in expr and 'return' in expr:
+                                second_for_idx = expr.find('\nfor ')
+                                if second_for_idx != -1:
+                                    expr = expr[:second_for_idx] + " return (" + expr[second_for_idx + 1:] + ")"
+                            
+                            # Also normalize element constructors to concat form for nested templates
+                            processed = _convert_element_constructors_generic(expr)
+                            processed = XMLUtilities.preprocess_xquery(processed)
+                            query = parser.parse(processed.strip())
+                            result = query.evaluate(context=context)
+                            if result is None:
+                                evaluated: List = []
+                            elif isinstance(result, (list, tuple)):
+                                evaluated = list(result)
+                            elif hasattr(result, '__iter__') and not isinstance(result, str):
+                                evaluated = list(result)
+                            else:
+                                evaluated = [result]
+                            
+                            rendered = []
+                            for item in evaluated:
+                                if hasattr(item, 'elem'):
+                                    rendered.append(etree.tostring(item.elem, encoding='unicode', pretty_print=True))
+                                elif isinstance(item, str):
+                                    rendered.append(item)
+                                elif hasattr(item, 'value'):
+                                    rendered.append(str(item.value))
+                                else:
+                                    rendered.append(str(item))
+                            parts.append(''.join(rendered))
+                        expr_buf = []
+                    else:
+                        expr_buf.append('}')
                 else:
-                    formatted_results.append(str(item))
-            
-            if not formatted_results:
-                return True, "Query executed successfully (empty result)", []
-            
-            return True, f"Query executed successfully ({len(formatted_results)} result(s))", formatted_results
-            
-        except Exception as e:
-            return False, f"XQuery execution error: {str(e)}", []
+                    expr_buf.append(ch)
+                i += 1
+                continue
+            else:
+                literal_buf.append(ch)
+            i += 1
+        
+        if expr_depth != 0:
+            return False, "XQuery execution error: unmatched braces in template", []
+        
+        if literal_buf:
+            parts.append(''.join(literal_buf))
+        
+        rendered_output = ''.join(parts)
+        return True, f"Query executed successfully (1 result(s))", [rendered_output.strip()]
+    
+    @staticmethod
+    def _resolve_external_resources(query: str) -> Tuple[str, dict]:
+        """
+        Resolve XQuery/XPath external resource calls like doc() and collection().
+        - doc("path") is replaced with a bound variable (e.g., $__doc_0), and the variable is
+          mapped to the parsed root element of the resolved XML document.
+        - collection() currently resolves to empty sequence ().
+        Returns the transformed query and a variables mapping for XPathContext.
+        Security: restricts resolution to current working directory and the project's samples/ folder.
+        """
+        variables: dict = {}
+        doc_var_index = 0
+
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        samples_dir = os.path.join(project_root, 'samples')
+        cwd = os.getcwd()
+
+        def is_allowed(path: str) -> bool:
+            ap = os.path.abspath(path)
+            return ap.startswith(cwd + os.sep) or ap.startswith(samples_dir + os.sep) or ap == cwd or ap == samples_dir
+
+        # Resolve doc('...') occurrences
+        doc_pattern = re.compile(r'doc\(\s*([\"\"])\s*(.*?)\s*\1\s*\)')
+
+        def resolve_doc(m: re.Match) -> str:
+            nonlocal doc_var_index
+            raw_path = m.group(2).strip()
+            candidate_paths = []
+            # Absolute or relative as provided
+            candidate_paths.append(raw_path)
+            # If just a basename, try under samples/
+            if not os.path.isabs(raw_path) and os.path.dirname(raw_path) == '':
+                candidate_paths.append(os.path.join(samples_dir, raw_path))
+                candidate_paths.append(os.path.join(cwd, raw_path))
+            # Also try relative to CWD and samples when a relative subpath was given
+            if not os.path.isabs(raw_path):
+                candidate_paths.append(os.path.join(cwd, raw_path))
+                candidate_paths.append(os.path.join(samples_dir, raw_path))
+
+            resolved = None
+            for p in candidate_paths:
+                if os.path.exists(p) and is_allowed(p):
+                    resolved = p
+                    break
+            if resolved is None:
+                # Unresolvable doc() -> empty sequence
+                return '()'
+            try:
+                with open(resolved, 'r', encoding='utf-8') as f:
+                    xml_text = f.read()
+                root = etree.fromstring(xml_text.encode('utf-8'))
+                var_name = f'__doc_{doc_var_index}'
+                variables[var_name] = root
+                doc_var_index += 1
+                return f'$${var_name}'
+            except Exception:
+                return '()'
+
+        query = doc_pattern.sub(resolve_doc, query)
+
+        # Resolve collection('...') as empty sequence for now
+        coll_pattern = re.compile(r'collection\(\s*([\"\"])\s*.*?\s*\1\s*\)')
+        query = coll_pattern.sub('()', query)
+
+        return query, {k: v for k, v in variables.items()}
+    
+    @staticmethod
+    def execute_xquery(xml_string: str, xquery_string: str, working_dir: Optional[str] = None) -> Tuple[bool, str, List]:
+        """
+        Execute XQuery expression or template against XML document.
+
+        This delegates to the dedicated xquery_engine (template-first, spec-aligned
+        renderer). It keeps the public API stable for tests and callers.
+        """
+        from .xquery_engine import execute_xquery as _engine_execute
+        return _engine_execute(xml_string, xquery_string, working_dir)
