@@ -136,32 +136,34 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        pythonWithDeps = pkgs.python3.withPackages (ps: [ saxonchePkg ps.lxml ps.pygments ]);
+        # Use Python 3.11 for saxonche 12.9.0 (cp311 wheel), matching the working example
+        python311 = pkgs.python311;
+        pythonWithDeps = python311.withPackages (ps: [ saxonchePkg ps.lxml ps.pygments ps.elementpath ps.setuptools ps.wheel ]);
 
-        saxonchePkg = pkgs.python3Packages.buildPythonPackage rec {
+        # Package saxonche from the upstream cp311 wheel (no binary checked into repo)
+        saxonchePkg = python311.pkgs.buildPythonPackage rec {
           pname = "saxonche";
           version = "12.9.0";
           format = "wheel";
 
-          src = pkgs.python3Packages.fetchPypi {
-            inherit pname version;
-            format = "wheel";
-            wheel = "saxonche-12.9.0-cp313-cp313-manylinux_2_24_x86_64.whl";
-            sha256 = "b7d295ddeae3e7c355cf53035ec47a1db301a8b9bc917636f893b56a31a48187";
+          src = pkgs.fetchurl {
+            url = "https://files.pythonhosted.org/packages/2c/ce/fb7330d9a57e410d225df4c749691b44dd3a3bfa826b1fd15660473cae4b/saxonche-12.9.0-cp311-cp311-manylinux_2_24_x86_64.whl";
+            sha256 = "1ip08a77jicsfy9kn03p8z0kwdp1i51177b2cs0h9mwk1p4b4nl6";
           };
 
-          nativeBuildInputs = [
-            pkgs.unzip
-            pkgs.autoPatchelfHook
+          nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+          buildInputs = [
+            pkgs.stdenv.cc.cc.lib  # libstdc++
+            pkgs.zlib
+            pkgs.libxml2
           ];
-          buildInputs = [ pkgs.zlib ];
 
           doCheck = false;
         };
         
-        # Common Python package build
+        # Common Python package build (pin to Python 3.11 to match saxonche)
         pythonPackage = { pname, gui ? false }:
-          pkgs.python3Packages.buildPythonApplication {
+          pkgs.python311Packages.buildPythonApplication {
             inherit pname;
             version = "1.0.0";
             
@@ -173,16 +175,17 @@
 
             pythonRelaxDeps = if gui then [ "PyQt6-QScintilla" ] else [];
             
-            nativeBuildInputs = with pkgs.python3Packages; [
+            nativeBuildInputs = with pkgs.python311Packages; [
               setuptools
               wheel
             ] ++ pkgs.lib.optionals gui [
               pkgs.qt6.wrapQtAppsHook
             ];
             
-            propagatedBuildInputs = with pkgs.python3Packages; [
+            propagatedBuildInputs = with pkgs.python311Packages; [
               lxml
               pygments
+              elementpath
               saxonchePkg
             ] ++ pkgs.lib.optionals gui [
               pyqt6
@@ -232,7 +235,7 @@
           
           # Test Python module import
           echo "Testing Python module import..."
-          ${pkgs.python3}/bin/python3 -c "import xmleditor; print('✓ xmleditor module imported successfully')" || {
+          ${pythonWithDeps}/bin/python3 -c "import xmleditor; print('✓ xmleditor module imported successfully')" || {
             echo "ERROR: Failed to import xmleditor module"
             exit 1
           }
@@ -252,7 +255,7 @@ print('✓ XML validation works')
 
           # Test XQuery engine availability (saxonche)
           echo "Testing XQuery engine..."
-          PYTHONPATH="${xml-editor-cli}/lib/${pkgs.python3.libPrefix}/site-packages:${pythonWithDeps}/lib/${pkgs.python3.libPrefix}/site-packages" \
+          PYTHONPATH="${xml-editor-cli}/lib/${python311.libPrefix}/site-packages:${pythonWithDeps}/lib/${python311.libPrefix}/site-packages" \
           ${pythonWithDeps}/bin/python3 - <<'PY'
 from xmleditor.xml_utils import XMLUtilities
 xml = "<root><item>1</item><item>2</item></root>"
@@ -264,7 +267,7 @@ PY
           
           # Test XPath
           echo "Testing XPath functionality..."
-          ${pkgs.python3}/bin/python3 -c "
+          ${pythonWithDeps}/bin/python3 -c "
 from xmleditor.xml_utils import XMLUtilities
 xml = '<?xml version=\"1.0\"?><root><child>test</child></root>'
 results = XMLUtilities.xpath_query(xml, '//child/text()')
@@ -277,7 +280,7 @@ print('✓ XPath functionality works')
           
           # Test formatting
           echo "Testing XML formatting..."
-          ${pkgs.python3}/bin/python3 -c "
+          ${pythonWithDeps}/bin/python3 -c "
 from xmleditor.xml_utils import XMLUtilities
 xml = '<root><child>test</child></root>'
 formatted = XMLUtilities.format_xml(xml)
@@ -344,22 +347,23 @@ print('✓ XML formatting works')
         };
         
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            python3
-            python3Packages.pyqt6
-            python3Packages.lxml
-            python3Packages.pygments
-            saxonchePkg
-            python3Packages.setuptools
-            python3Packages.wheel
-            qt6.qtbase
-            qt6.qtwayland
+          buildInputs = [
+            pythonWithDeps
+            pkgs.python3Packages.pyqt6
+            pkgs.qt6.qtbase
+            pkgs.qt6.qtwayland
           ];
-          
+
+          QT_QPA_PLATFORM = "offscreen";
+
           shellHook = ''
             echo "XML Editor development environment"
-            echo "Run 'python -m xmleditor.main' to start the application"
-            echo "Run 'python test_functionality.py' to run tests"
+            ${pythonWithDeps}/bin/python3 --version || true
+            ${pythonWithDeps}/bin/python3 - <<'PY'
+import importlib.util
+print("saxonche available" if importlib.util.find_spec("saxonche") else "saxonche NOT available")
+PY
+            echo "Run 'pytest -q' to run tests"
           '';
         };
       }
