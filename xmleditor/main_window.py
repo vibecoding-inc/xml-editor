@@ -19,7 +19,6 @@ from xmleditor.xpath_dialog import XPathDialog
 from xmleditor.validation_dialog import ValidationDialog
 from xmleditor.xslt_dialog import XSLTDialog
 from xmleditor.schema_generation_dialog import SchemaGenerationDialog
-from xmleditor.xquery_panel import XQueryPanel
 from xmleditor.xml_utils import XMLUtilities
 from xmleditor.theme_manager import ThemeManager, ThemeType
 
@@ -104,9 +103,6 @@ class MainWindow(QMainWindow):
         
         # Create XSLT panel as dock widget
         self.create_xslt_panel()
-        
-        # Create XQuery panel as dock widget
-        self.create_xquery_panel()
         
         # Create menu bar
         self.create_menu_bar()
@@ -255,12 +251,6 @@ class MainWindow(QMainWindow):
         xpath_action.triggered.connect(self.show_xpath_dialog)
         xml_menu.addAction(xpath_action)
         
-        xquery_action = QAction("X&Query...", self)
-        xquery_action.setShortcut(QKeySequence("Ctrl+Shift+Q"))
-        xquery_action.setStatusTip("Execute XQuery expressions")
-        xquery_action.triggered.connect(self.toggle_xquery_panel)
-        xml_menu.addAction(xquery_action)
-        
         xslt_action = QAction("XS&LT Transform...", self)
         xslt_action.setShortcut(QKeySequence("Ctrl+Shift+T"))
         xslt_action.setStatusTip("Apply XSLT transformation")
@@ -304,11 +294,6 @@ class MainWindow(QMainWindow):
         toggle_xslt_action.setStatusTip("Toggle XSLT transformation panel")
         toggle_xslt_action.triggered.connect(self.toggle_xslt_panel)
         view_menu.addAction(toggle_xslt_action)
-        
-        toggle_xquery_action = QAction("Toggle X&Query Panel", self)
-        toggle_xquery_action.setStatusTip("Toggle XQuery execution panel")
-        toggle_xquery_action.triggered.connect(self.toggle_xquery_panel)
-        view_menu.addAction(toggle_xquery_action)
         
         view_menu.addSeparator()
         
@@ -394,10 +379,6 @@ class MainWindow(QMainWindow):
         xpath_action = QAction("XPath", self)
         xpath_action.triggered.connect(self.show_xpath_dialog)
         toolbar.addAction(xpath_action)
-        
-        xquery_action = QAction("XQuery", self)
-        xquery_action.triggered.connect(self.toggle_xquery_panel)
-        toolbar.addAction(xquery_action)
         
         toolbar.addSeparator()
         
@@ -737,28 +718,6 @@ class MainWindow(QMainWindow):
         self.xslt_dock.setWidget(xslt_widget)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.xslt_dock)
         self.xslt_dock.hide()
-    
-    def create_xquery_panel(self):
-        """Create XQuery execution panel."""
-        self.xquery_dock = QDockWidget("XQuery", self)
-        self.xquery_dock.setObjectName("XQueryDock")
-        
-        # Create XQuery panel with callback to get current XML
-        self.xquery_panel = XQueryPanel(
-            theme_type=self.current_theme,
-            get_xml_callback=self.get_current_xml_content
-        )
-        
-        self.xquery_dock.setWidget(self.xquery_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.xquery_dock)
-        self.xquery_dock.hide()
-    
-    def get_current_xml_content(self):
-        """Get the XML content from the current editor tab."""
-        editor = self.get_current_editor()
-        if editor:
-            return editor.get_text()
-        return None
     
     def _create_separator(self):
         """Create a vertical separator line."""
@@ -1548,13 +1507,6 @@ class MainWindow(QMainWindow):
         else:
             self.xslt_dock.show()
     
-    def toggle_xquery_panel(self):
-        """Toggle XQuery panel visibility."""
-        if self.xquery_dock.isVisible():
-            self.xquery_dock.hide()
-        else:
-            self.xquery_dock.show()
-    
     def refresh_graph_view(self):
         """Refresh the XML graph view."""
         editor = self.get_current_editor()
@@ -1600,10 +1552,6 @@ class MainWindow(QMainWindow):
             editor = self.tab_widget.widget(i)
             if isinstance(editor, XMLEditor):
                 editor.apply_theme(theme_type)
-        
-        # Apply theme to XQuery panel
-        if hasattr(self, 'xquery_panel'):
-            self.xquery_panel.apply_theme(theme_type)
         
         self.settings.setValue("theme", theme_type.value)
         self.statusBar().showMessage(f"Theme changed to {ThemeManager.get_theme_names()[theme_type]}")

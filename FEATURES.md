@@ -128,41 +128,6 @@ count(//element)             - Count elements
 - **Output Methods**: XML, HTML, text
 - **Error Handling**: Detailed transformation errors
 
-### XQuery Support
-
-#### XQuery Panel
-- **File-Based Editor**: Dedicated code editor for XQuery files (.xq, .xquery)
-- **File Management**:
-  - Browse and select existing XQuery files
-  - Create new XQuery files
-  - Auto-save changes (1 second after typing stops)
-  - Auto-reload on external changes
-  - File watching for external modifications
-- **Syntax Support**: XPath 3.0 with XQuery-like expressions
-- **Query Execution**: Execute queries against currently open XML document
-- **Result Display**: Formatted results in dedicated panel
-
-#### XQuery Expression Support
-- **Path Expressions**: Navigate XML structure (`//book/title`)
-- **Predicates**: Filter nodes (`//book[price > 30]`)
-- **FLWOR Expressions**: Basic for...return constructs
-  - Example: `for $b in //book return $b/title/text()`
-- **Functions**: XPath 3.0 functions
-  - `count()`, `sum()`, `max()`, `min()`
-  - `string-join()`, `concat()`, `substring()`
-  - `contains()`, `starts-with()`, `ends-with()`
-- **Text Extraction**: Extract text content from elements
-- **Attribute Access**: Query element attributes
-- **Result Formatting**: Pretty-printed XML elements or text values
-
-#### XQuery Panel Features
-- **Split View**: Query editor on top, results on bottom
-- **Persistent Queries**: Save queries to files for reuse
-- **Multiple Query Files**: Work with different query sets
-- **Current Document Context**: Automatically queries active XML document
-- **Error Reporting**: Clear error messages for invalid queries
-- **Result Count**: Shows number of results returned
-
 ### XML Tree View
 
 #### Structure Visualization
@@ -268,14 +233,12 @@ count(//element)             - Count elements
 - Ctrl+Shift+F - Format XML
 - Ctrl+Shift+V - Validate
 - Ctrl+Shift+X - XPath Query
-- Ctrl+Shift+Q - XQuery Panel
 - Ctrl+Shift+T - XSLT Transform
 
 #### View Operations
 - Ctrl+T - Toggle Tree View
 - Ctrl+O - Toggle Output Panel
 - Ctrl+G - Toggle Graph View
-- Ctrl+Shift+Q - Toggle XQuery Panel
 - F5 - Refresh Tree
 
 ### Settings and Preferences

@@ -30,7 +30,7 @@ books_xml = """<?xml version="1.0" encoding="UTF-8"?>
         <description>The magical world of Harry Potter</description>
     </book>
     <book category="web">
-        <title lang="en">XQuery Kick Start</title>
+        <title lang="en">XML Handbook</title>
         <author>James McGovern</author>
         <author>Per Bothner</author>
         <author>Kurt Cagle</author>
@@ -38,7 +38,7 @@ books_xml = """<?xml version="1.0" encoding="UTF-8"?>
         <author>Vaidyanathan Nagarajan</author>
         <year>2003</year>
         <price>49.99</price>
-        <description>XQuery fundamentals and practical examples</description>
+        <description>XML fundamentals and practical examples</description>
     </book>
 </bookstore>"""
 

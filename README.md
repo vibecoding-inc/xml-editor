@@ -27,7 +27,6 @@ A fully-featured cross-platform XML editor desktop application built with Python
 ### Advanced Features
 - **Side-by-Side Editing**: Edit XML and its schema simultaneously in different tabs
 - **XPath Queries**: Execute XPath expressions with results display
-- **XQuery Support**: Execute XQuery expressions with file-based editor and persistent queries
 - **XSLT Transformations**: Apply XSLT stylesheets to transform XML
 - **Find & Replace**: Search and replace text in documents
 - **Comment/Uncomment**: Toggle XML comments easily
