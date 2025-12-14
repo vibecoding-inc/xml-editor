@@ -371,12 +371,14 @@ class XQueryPanel(QWidget):
         fragment_count = "1"
         
         try:
-            result_tree = etree.fromstring(result_xml.encode('utf-8'))
+            parser = etree.XMLParser(resolve_entities=False, recover=False)
+            result_tree = etree.fromstring(result_xml.encode('utf-8'), parser=parser)
             fragments = result_tree.findall('./result')
             fragment_count = str(len(fragments))
             pretty_result = etree.tostring(result_tree, encoding='unicode', pretty_print=True)
-        except Exception:
-            pass
+        except etree.XMLSyntaxError:
+            fragment_count = "1"
+            pretty_result = result_xml.strip()
         
         self.status_label.setText("Success")
         self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('green')};")
