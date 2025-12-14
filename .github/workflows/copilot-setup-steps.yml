@@ -45,16 +45,3 @@ jobs:
           nix --version
           echo "Nix flakes enabled: $(nix flake show --help > /dev/null 2>&1 && echo 'yes' || echo 'no')"
           echo "Nix is ready for Copilot!"
-
-      - name: Install GUI dependencies for screenshots
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libegl1 \
-            libxkbcommon-x11-0 \
-            libxcb-icccm4 \
-            libxcb-image0 \
-            libxcb-keysyms1 \
-            libxcb-render-util0 \
-            libxcb-xinerama0 \
-            libxcb-cursor0

@@ -166,58 +166,6 @@ Apply XSLT stylesheets to transform XML:
    - **Save Result**: Save to file
    - **Apply to Editor**: Replace current content
 
-### XQuery Execution
-
-**XML → XQuery** (or Ctrl+Shift+Q)
-
-Execute XQuery expressions against your XML documents:
-
-1. **Open XQuery Panel**:
-   - Click XML → XQuery in menu
-   - Or use Ctrl+Shift+Q
-   - Panel opens on the right side
-
-2. **Create or Open XQuery File**:
-   - Click **"New File..."** to create a new .xq file
-   - Or click **"Browse..."** to open an existing query file
-   - The file path is displayed at the top
-
-3. **Write Your Query**:
-   - Type XQuery expressions in the editor
-   - Changes are auto-saved 1 second after you stop typing
-   - Supports XPath 3.0 syntax and basic FLWOR expressions
-
-4. **Execute Query**:
-   - Click **"Execute Query"** button
-   - Results appear in the bottom half of the panel
-   - Results show:
-     - Success/error message
-     - Number of results
-     - Formatted result items
-
-5. **Example Queries**:
-   ```xquery
-   // Get all book titles
-   //book/title/text()
-   
-   // Books with price over 30
-   //book[price > 30]/title/text()
-   
-   // FLWOR expression
-   for $b in //book return $b/title/text()
-   
-   // Count elements
-   count(//book)
-   
-   // Join text values
-   string-join(//book/author/text(), ', ')
-   ```
-
-6. **File Management**:
-   - Changes to the query file are saved automatically
-   - External changes are detected and you can reload
-   - Query files are reusable across sessions
-
 ### Tree View
 
 **View → Toggle Tree View** (or Ctrl+T)
@@ -367,12 +315,9 @@ You can open multiple XML Editor windows to work on different files.
 | Format XML | Ctrl+Shift+F |
 | Validate | Ctrl+Shift+V |
 | XPath Query | Ctrl+Shift+X |
-| XQuery Panel | Ctrl+Shift+Q |
 | XSLT Transform | Ctrl+Shift+T |
 | Toggle Tree View | Ctrl+T |
 | Toggle Output | Ctrl+O |
-| Toggle Graph View | Ctrl+G |
-| Toggle XQuery Panel | Ctrl+Shift+Q |
 | Refresh Tree | F5 |
 
 ## Troubleshooting
