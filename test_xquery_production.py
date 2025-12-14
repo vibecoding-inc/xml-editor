@@ -89,6 +89,43 @@ def test_element_construction_with_flwor():
         "Learning XML",
     ]
 
+def test_html_fragment_query_results_in_result_element():
+    """Top-level XQuery with constructed HTML returns inside a <result> tag without escaping."""
+    xml_books = """<?xml version="1.0"?>
+<BOOKS>
+  <ITEM>
+    <TITLE>Learning XML</TITLE>
+    <AUTHOR>Erik T. Ray</AUTHOR>
+  </ITEM>
+  <ITEM>
+    <TITLE>Everyday Italian</TITLE>
+    <AUTHOR>Giada De Laurentiis</AUTHOR>
+  </ITEM>
+</BOOKS>"""
+    query = """
+    xquery version "1.0";
+    <h1>A list of books</h1>
+    <p>Here are some interesting books:</p>
+    <ul>{
+      for $b in //BOOKS/ITEM
+      order by $b/TITLE
+      return <li><i>{ string($b/TITLE) }</i> by { string($b/AUTHOR) }</li>
+    }</ul>
+    """
+    success, message, result_xml = XMLUtilities.execute_xquery(xml_books, query)
+    assert success, message
+    
+    doc = etree.fromstring(result_xml.encode('utf-8'))
+    result = doc.find('./result')
+    assert result is not None, "Expected a <result> element wrapping output"
+    
+    h1 = result.find('h1')
+    assert h1 is not None and h1.text == "A list of books"
+    
+    lis = result.findall('.//ul/li')
+    assert len(lis) == 2
+    assert [li.xpath('string(i)') for li in lis] == ["Everyday Italian", "Learning XML"]
+
 if __name__ == "__main__":
     test_production_xquery()
     test_scalar_result_wrapped_in_xml()
