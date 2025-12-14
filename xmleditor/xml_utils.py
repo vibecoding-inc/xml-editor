@@ -5,12 +5,6 @@ XML utilities for parsing, validating, and manipulating XML documents.
 from lxml import etree
 import xml.dom.minidom
 from typing import Optional, List, Tuple
-try:
-    from elementpath.xpath30 import XPath30Parser
-    import elementpath
-    XQUERY_AVAILABLE = True
-except ImportError:
-    XQUERY_AVAILABLE = False
 
 
 class XMLUtilities:
@@ -600,66 +594,3 @@ class XMLUtilities:
                 lines.append(f'<!ATTLIST {element_name} {attr_name} CDATA {required}>')
         
         return '\n'.join(lines)
-    
-    @staticmethod
-    def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, List]:
-        """
-        Execute XQuery expression against XML document.
-        
-        Args:
-            xml_string: XML content as string
-            xquery_string: XQuery expression (XPath 3.0 syntax)
-            
-        Returns:
-            Tuple of (success, message, results)
-            - success: True if execution succeeded
-            - message: Success or error message
-            - results: List of result items
-        """
-        if not XQUERY_AVAILABLE:
-            return False, "XQuery support not available. Install 'elementpath' package.", []
-        
-        try:
-            # Parse XML
-            tree = etree.fromstring(xml_string.encode('utf-8'))
-            
-            # Create XPath 3.0 parser (supports XQuery-like syntax)
-            parser = XPath30Parser()
-            
-            # Parse and execute query
-            query = parser.parse(xquery_string.strip())
-            context = elementpath.XPathContext(tree)
-            result = query.evaluate(context=context)
-            
-            # Convert result to list
-            if result is None:
-                result_list = []
-            elif isinstance(result, (list, tuple)):
-                result_list = list(result)
-            elif hasattr(result, '__iter__') and not isinstance(result, str):
-                result_list = list(result)
-            else:
-                result_list = [result]
-            
-            # Format results for display
-            formatted_results = []
-            for item in result_list:
-                if hasattr(item, 'elem'):
-                    # ElementNode - convert to string
-                    elem = item.elem
-                    formatted_results.append(etree.tostring(elem, encoding='unicode', pretty_print=True))
-                elif isinstance(item, str):
-                    formatted_results.append(item)
-                elif hasattr(item, 'value'):
-                    # TextNode or other node with value
-                    formatted_results.append(str(item.value))
-                else:
-                    formatted_results.append(str(item))
-            
-            if not formatted_results:
-                return True, "Query executed successfully (empty result)", []
-            
-            return True, f"Query executed successfully ({len(formatted_results)} result(s))", formatted_results
-            
-        except Exception as e:
-            return False, f"XQuery execution error: {str(e)}", []
