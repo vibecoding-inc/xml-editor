@@ -151,7 +151,7 @@
             sha256 = "1ip08a77jicsfy9kn03p8z0kwdp1i51177b2cs0h9mwk1p4b4nl6";
           };
 
-          nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+          nativeBuildInputs = [ pkgs.unzip pkgs.autoPatchelfHook ];
           buildInputs = [
             pkgs.stdenv.cc.cc.lib  # libstdc++
             pkgs.zlib

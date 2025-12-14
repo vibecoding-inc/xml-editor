@@ -5,9 +5,9 @@ XQuery panel for executing XQuery expressions with file-based editor.
 import os
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QTextEdit, QFileDialog, QMessageBox,
-                              QSplitter, QFrame, QLineEdit, QTextEdit)
+                              QSplitter, QFrame, QLineEdit, QTextEdit, QTextBrowser, QTabWidget)
 from PyQt6.QtCore import Qt, QTimer, QFileSystemWatcher
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtGui import QFont, QColor, QTextCursor
 from PyQt6.Qsci import QsciScintilla
 from lxml import etree
 from xmleditor.xml_utils import XMLUtilities
@@ -205,15 +205,24 @@ class XQueryPanel(QWidget):
         bottom_layout.addWidget(status_frame)
         
         # Results list widget
-        results_label = QLabel("Result (XML):")
+        results_label = QLabel("Result:")
         bottom_layout.addWidget(results_label)
+        
+        self.result_tabs = QTabWidget()
         
         self.result_view = QTextEdit()
         self.result_view.setReadOnly(True)
         font = QFont("Courier New", 10)
         self.result_view.setFont(font)
         self.result_view.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-        bottom_layout.addWidget(self.result_view)
+        self.result_tabs.addTab(self.result_view, "Source")
+        
+        self.html_view = QTextBrowser()
+        self.html_view.setOpenExternalLinks(False)
+        self.html_view.setOpenLinks(False)
+        self.result_tabs.addTab(self.html_view, "HTML")
+        
+        bottom_layout.addWidget(self.result_tabs)
         
         splitter.addWidget(bottom_widget)
         
@@ -358,10 +367,8 @@ class XQueryPanel(QWidget):
         self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('red')};")
         self.result_count_label.setText("")
         
-        self.result_list.clear()
-        item = QListWidgetItem(f"❌ {message}")
-        item.setForeground(QColor(theme.get_color('red')))
-        self.result_list.addItem(item)
+        self.result_view.setPlainText(f"❌ {message}")
+        self.html_view.setHtml(f"<p style='color:red;'>❌ {message}</p>")
     
     def show_results(self, message, result_xml: str):
         """Display query results."""
@@ -374,11 +381,11 @@ class XQueryPanel(QWidget):
         self.result_count_label.setText("")
         
         display_text = pretty_result
-        if len(display_text) > self.MAX_RESULT_DISPLAY_LENGTH:
-            display_text = display_text[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
-        
         self.result_view.setPlainText(display_text)
-        self.result_view.moveCursor(self.result_view.textCursor().Start)
+        self.result_view.moveCursor(QTextCursor.MoveOperation.Start)
+        
+        # Render HTML view
+        self.html_view.setHtml(result_xml)
     
     def apply_theme(self, theme_type):
         """Apply theme to the panel."""
