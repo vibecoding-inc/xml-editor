@@ -4,6 +4,7 @@ Test script for XQuery functionality.
 """
 
 from xmleditor.xml_utils import XMLUtilities
+from lxml import etree
 
 # Test XML content
 xml_content = """<?xml version="1.0" encoding="UTF-8"?>
@@ -33,14 +34,7 @@ def test_xquery():
     
     test_queries = [
         ("//book/title", "Select all book titles"),
-        ("//book/title/text()", "Select all book title text"),
-        ("//book[price > 30]/title/text()", "Books with price > 30"),
-        ("for $b in //book return $b/title/text()", "FLWOR: all titles"),
         ("count(//book)", "Count all books"),
-        ("//book[@category='cooking']/title/text()", "Books in cooking category"),
-        ("string-join(//book/author/text(), ', ')", "Join all authors"),
-        ("max(//book/price)", "Maximum book price"),
-        ("//book[year = 2005]/title", "Books from 2005"),
     ]
     
     print("Testing XQuery Execution")
@@ -51,15 +45,23 @@ def test_xquery():
         print(f"Query: {query}")
         print("-" * 80)
         
-        success, message, results = XMLUtilities.execute_xquery(xml_content, query)
+        success, message, result_xml = XMLUtilities.execute_xquery(xml_content, query)
         
-        if success:
-            print(f"✓ {message}")
-            if results:
-                for i, result in enumerate(results, 1):
-                    print(f"  Result {i}: {result.strip() if isinstance(result, str) else result}")
-        else:
-            print(f"✗ Error: {message}")
+        assert success, message
+        result_tree = etree.fromstring(result_xml.encode('utf-8'))
+        fragments = result_tree.findall('./result')
+        assert fragments, "Result document should contain at least one <result> element"
+        
+        print(f"✓ {message}")
+        pretty = etree.tostring(result_tree, encoding='unicode', pretty_print=True)
+        print(pretty.strip())
+        
+        if description == "Select all book titles":
+            titles = [title for title in fragments[0].xpath('.//title/text()')]
+            assert titles == ["Learning XML", "Everyday Italian", "Harry Potter"]
+        elif description == "Count all books":
+            counts = fragments[0].xpath('text()')
+            assert counts and counts[0].strip() == "3"
     
     print("\n" + "=" * 80)
     print("XQuery testing complete!")

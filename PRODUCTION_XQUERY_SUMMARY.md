@@ -22,102 +22,17 @@ return
 **Error**: `'version' name at line 2, column 8: [err:XPST0003] unexpected name 'version'`
 
 ## Solution Implemented
-
-### Phase 1: Basic Fix
-Fixed the immediate issue by implementing preprocessing to handle:
-- XQuery version declarations
-- XQuery comments
-- doc() function calls
-- Invalid FLWOR structures (let after return)
-- Element construction
-
-### Phase 2: Production-Ready Enhancement
-Extended the solution to handle the full spectrum of XQuery patterns used in production environments:
-
-#### 1. Declarations & Metadata
-- **XQuery version declarations** with optional encoding
-  ```xquery
-  xquery version "1.0" encoding "UTF-8";
-  ```
-- **Namespace declarations**
-  ```xquery
-  declare namespace ex = "http://example.com";
-  ```
-- **Boundary-space and other declare statements**
-- **Pragmas**
-  ```xquery
-  (# opt:level 10 #)
-  ```
-- **Comments** with proper handling of colons inside
-  ```xquery
-  (: This comment has : colons : inside :)
-  ```
-
-#### 2. Document Functions
-- **doc()** - Removed and path kept
-- **doc-available()** - Returns `true()`
-- **collection()** - Returns empty sequence `()`
-
-#### 3. FLWOR Expressions
-Full support for complex FLWOR patterns:
-
-**For-Where-Return:**
-```xquery
-for $book in //book
-where $book/@price > 30
-return $book/title/text()
-```
-Converts to: `for $book in //book[@price > 30] return $book/title/text()`
-
-**For-Let-Return:**
-```xquery
-for $book in //book
-let $discount := $book/@price * 0.1
-return concat($book/title/text(), ' - $', $discount)
-```
-Converts to: `for $book in //book return concat($book/title/text(), ' - $', $book/@price * 0.1)`
-
-**For-Let-Where-Return (Combined):**
-```xquery
-for $book in //book
-let $price := $book/@price
-where $price > 30 and $book/year = 2003
-return $book/title/text()
-```
-Converts to: `for $book in //book[$book/@price > 30 and ./year = 2003] return $book/title/text()`
-
-**Multiple Conditions:**
-```xquery
-for $item in //item
-where $item/@status = 'active' and $item/quantity > 0
-return $item/name/text()
-```
-
-#### 4. Path Expression Handling
-Smart conversion of variable references in where clauses:
-- `$var/@attribute` → `@attribute`
-- `$var/child` → `./child`
-- `$var` → `.`
-
-#### 5. Element Construction
-Properly handles and converts element construction:
-```xquery
-for $book in //book
-where $book/@category = 'web'
-return <WebBook>{$book/title/text()}</WebBook>
-```
-
-#### 6. Security Hardening
-- **ReDoS Protection**: All variable names are escaped with `re.escape()` before use in regex patterns
-- **Input Validation**: Robust regex patterns with proper quantifiers
-- **Word Boundaries**: Prevents partial variable name matches
+- Replaced the custom XPath-based runner with the official Saxon/C engine via `saxonche` (PySaxonC).
+- XQuery is executed as written (no preprocessing), using the currently open XML document as context.
+- Supports running multiple XQuery fragments contained inside an XML file (e.g., `<queries><xquery>...</xquery></queries>`).
+- Results are aggregated into a well-formed XML document rooted at `<xqueryResults>` for display and downstream processing.
 
 ## Test Coverage
 
 ### Test Suites
-1. **test_xquery_preprocessing.py** - Basic preprocessing tests (6 tests)
-2. **test_xquery_production.py** - Production patterns (11 tests)
-3. **test_xquery.py** - Original XQuery tests (9 tests)
+1. **test_xquery_preprocessing.py** - Multi-fragment container execution
+2. **test_xquery_production.py** - Production patterns executed via Saxon/C
+3. **test_xquery.py** - Core XQuery result document checks
 4. **test_issue_demo.py** - Original problematic query verification
 5. **test_functionality.py** - Full application test suite
 6. **test_schema_generation.py** - Schema generation tests
@@ -173,17 +88,8 @@ xquery version "1.0";
 
 ## Known Limitations
 
-The following XQuery features are NOT supported (documented):
-- `order by` in FLWOR (sorting not supported in XPath 3.0)
-- `group by` in FLWOR
-- User-defined functions
-- Modules and imports
-- Schema-aware processing
-- `typeswitch` expressions
-- Nested `for` loops
-- Multiple sequential `let` clauses
-
-These limitations are inherent to the XPath 3.0 engine (elementpath) and are clearly documented.
+The Saxon/C engine provides full XQuery 3.1 support, removing the XPath-based
+limitations of the previous runner.
 
 ## Performance & Security
 

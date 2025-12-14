@@ -30,13 +30,11 @@ Add a XQuery panel with:
 - External change detection via `QFileSystemWatcher`
 - Prompt to reload when file changes externally
 
-#### XQuery Support (via elementpath)
-- XPath 3.0 expressions
-- Basic FLWOR expressions (`for...return`)
-- Predicates and filters
-- Functions: `count()`, `sum()`, `max()`, `min()`, `string-join()`, etc.
-- Text extraction
-- Attribute access
+#### XQuery Support (via Saxon/C)
+- Full XQuery execution using the official `saxonche` (PySaxonC) engine
+- Context bound to the currently open XML document
+- Supports multi-fragment XML containers (e.g., `<queries><xquery>...</xquery></queries>`)
+- Aggregated XML result document rather than discrete list items
 
 #### User Interface
 - Split view: Query editor (top) / Results (bottom)
@@ -53,7 +51,7 @@ Add a XQuery panel with:
 - Automatic query context from active XML tab
 
 ### Dependencies
-- **elementpath>=5.0.0**: Provides XPath 3.0 / XQuery support
+- **saxonche>=12.9.0**: Official PySaxonC bindings for Saxon/C XQuery/XPath
 
 ### Testing
 - `test_xquery.py`: Comprehensive unit tests
@@ -80,14 +78,14 @@ Add a XQuery panel with:
 
 ### XQuery Execution
 ```python
-# Uses elementpath's XPath30Parser
-from elementpath.xpath30 import XPath30Parser
-import elementpath
+from saxonche import PySaxonProcessor
 
-parser = XPath30Parser()
-query = parser.parse(xquery_string)
-context = elementpath.XPathContext(tree)
-result = query.evaluate(context=context)
+with PySaxonProcessor(license=False) as processor:
+    source_doc = processor.parse_xml(xml_text=xml_string)
+    xquery_proc = processor.new_xquery_processor()
+    xquery_proc.set_context(xdm_item=source_doc)
+    xquery_proc.set_query_content(fragment)
+    result_xml = xquery_proc.run_query_to_string()
 ```
 
 ### File Auto-Save Pattern
@@ -164,101 +162,25 @@ max(//book/price)
 string-join(//book/author/text(), ', ')
 ```
 
-### XQuery Syntax with Preprocessing
-The following XQuery syntax is automatically converted to valid XPath 3.0:
+### Fragment Containers
+When the XQuery input itself is an XML document containing multiple fragments,
+each `<xquery>` or `<query>` element is executed in order and the results are
+combined into a single XML document:
 
-```xquery
-(: Example XQuery with version declaration and comments :)
-xquery version "1.0";
-<Result>{
-  for $s in doc("data.xml")/path/to/element
-  return
-    <Item> {$s/text()} </Item>,
-  let $k := count(doc("data.xml")/path/to/element)
-  return
-    <Count> {$k} </Count>
-}</Result>
+```xml
+<queries>
+  <xquery>//book/title</xquery>
+  <xquery>count(//book)</xquery>
+</queries>
 ```
 
-This is automatically preprocessed to:
-```xquery
-(for $s in /path/to/element return $s/text(), count(/path/to/element))
-```
+Every fragment result is wrapped in a `<result>` element under the root
+`<xqueryResults>` element to produce a well-formed XML document for display.
 
-## XQuery Syntax Preprocessing (Production-Ready)
-The system includes comprehensive, production-ready preprocessing that automatically converts XQuery syntax to XPath 3.0:
-
-### Declarations and Comments
-- **XQuery version declarations** (`xquery version "1.0";`, with optional encoding) are removed
-- **Namespace declarations** (`declare namespace ...`) are stripped
-- **XQuery comments** (`(: comment :)`) with support for colons inside comments
-- **Pragmas** (`(# pragma #)`) are removed
-- **Other declare statements** (boundary-space, ordering, etc.) are removed
-
-### Document Functions
-- **doc() function** calls are replaced with direct path references
-- **doc-available()** returns `true()` (assumes documents are available)
-- **collection()** returns empty sequence `()`
-
-### FLWOR Expressions
-- **for...return** - fully supported
-- **for...where...return** - `where` converted to predicate filters
-- **for...let...return** - `let` variables substituted inline
-- **for...let...where...return** - combined support with both let and where
-- **Multiple conditions** in where clauses with `and`/`or`
-- **Comma-separated** FLWOR sequences (e.g., `for...return..., let...return...`)
-
-### Element Construction
-- **Direct constructors** (`<tag>{expr}</tag>`) converted to text output
-- **Nested element construction** in FLWOR expressions
-- **Outer wrapper elements** removed when they wrap entire query
-
-### Path Expression Handling
-- **Attribute access** in where clauses: `$var/@attr` → `@attr`
-- **Child paths** in where clauses: `$var/child` → `./child`
-- **Variable references** with word boundary matching to avoid partial matches
-
-## Supported XQuery Patterns
-```xquery
--- Version declarations (automatically removed)
-xquery version "1.0" encoding "UTF-8";
-
--- Namespace declarations (automatically removed)
-declare namespace ex = "http://example.com";
-
--- Comments (automatically removed)
-(: This is a comment with : colons :)
-
--- FLWOR with where
-for $book in //book
-where $book/@price > 30
-return $book/title/text()
-
--- FLWOR with let
-for $book in //book
-let $discount := $book/@price * 0.1
-return concat($book/title/text(), ' - Discount: $', $discount)
-
--- FLWOR with let and where
-for $book in //book
-let $price := $book/@price
-where $price > 30 and $book/year = 2003
-return $book/title/text()
-
--- Multiple conditions
-for $item in //item
-where $item/@status = 'active' and $item/quantity > 0
-return $item/name/text()
-
--- Element construction
-for $book in //book
-where $book/@category = 'web'
-return <WebBook>{$book/title/text()}</WebBook>
-
--- With doc() function (automatically converted)
-for $s in doc("data.xml")/path/to/element
-return $s/text()
-```
+### Supported XQuery Patterns
+Saxon/C executes standard XQuery 3.1 syntax directly. FLWOR expressions,
+predicates, functions, element construction, and variables are all handled by
+the engine without preprocessing or translation.
 
 ## Limitations
 - XPath 3.0 support only (not full XQuery 3.0)
@@ -282,8 +204,8 @@ return $s/text()
 - `xmleditor/xquery_panel.py` (NEW): XQuery panel implementation
 - `xmleditor/xml_utils.py`: Added `execute_xquery()` method
 - `xmleditor/main_window.py`: Integration (dock widget, menu, toolbar)
-- `requirements.txt`: Added elementpath
-- `pyproject.toml`: Added elementpath dependency
+- `requirements.txt`: Adds saxonche
+- `pyproject.toml`: Adds saxonche dependency
 - `FEATURES.md`: Documentation
 - `USER_GUIDE.md`: Usage instructions
 - `README.md`: Feature mention

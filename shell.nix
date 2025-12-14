@@ -7,6 +7,7 @@ pkgs.mkShell {
     python3Packages.pyqt6-sip
     python3Packages.lxml
     python3Packages.pygments
+    python3Packages.saxonche
     python3Packages.setuptools
     python3Packages.wheel
     python3Packages.build
