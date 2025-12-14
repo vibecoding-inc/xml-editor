@@ -63,6 +63,32 @@ def test_scalar_result_wrapped_in_xml():
     assert "Learning XML" in results[0].text
     assert "Harry Potter" in results[0].text
 
+def test_element_construction_with_flwor():
+    """Element construction with FLWOR and ordering should be preserved."""
+    query = """
+    xquery version "1.0";
+    <h1>A list of books</h1>
+    <p>Here are some interesting books:</p>
+    <ul>{
+      for $b in //book
+      order by $b/title
+      return <li><i>{ string($b/title) }</i> by { string($b/author) }</li>
+    }</ul>
+    """
+    success, message, result_xml = XMLUtilities.execute_xquery(xml_content, query)
+    assert success, message
+    
+    tree = etree.fromstring(result_xml.encode('utf-8'))
+    result = tree.find('./result')
+    assert result is not None
+    
+    titles_in_li = [li.xpath('string(i)') for li in result.findall('.//li')]
+    assert titles_in_li == [
+        "Everyday Italian",
+        "Harry Potter",
+        "Learning XML",
+    ]
+
 if __name__ == "__main__":
     test_production_xquery()
     test_scalar_result_wrapped_in_xml()
