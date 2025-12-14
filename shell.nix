@@ -6,9 +6,11 @@ let
     version = "12.9.0";
     format = "wheel";
 
-    src = pkgs.fetchurl {
-      url = "https://files.pythonhosted.org/packages/2f/f5/136f27f36d2d301d1f60b90e47567f8d85763c9d71073c1c32f33828d9d7/saxonche-12.9.0-cp312-cp312-manylinux_2_24_x86_64.whl";
-      sha256 = "490f30e9486750f6a066de2b467114dfd6e14d23c8ce645cad64e663f580490a";
+    src = pkgs.python3Packages.fetchPypi {
+      inherit pname version;
+      format = "wheel";
+      wheel = "saxonche-12.9.0-cp313-cp313-manylinux_2_24_x86_64.whl";
+      sha256 = "b7d295ddeae3e7c355cf53035ec47a1db301a8b9bc917636f893b56a31a48187";
     };
 
     nativeBuildInputs = [

@@ -5,7 +5,7 @@ XQuery panel for executing XQuery expressions with file-based editor.
 import os
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QTextEdit, QFileDialog, QMessageBox,
-                              QSplitter, QFrame, QLineEdit, QListWidget, QListWidgetItem)
+                              QSplitter, QFrame, QLineEdit, QTextEdit)
 from PyQt6.QtCore import Qt, QTimer, QFileSystemWatcher
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.Qsci import QsciScintilla
@@ -205,15 +205,15 @@ class XQueryPanel(QWidget):
         bottom_layout.addWidget(status_frame)
         
         # Results list widget
-        results_label = QLabel("Results:")
+        results_label = QLabel("Result (XML):")
         bottom_layout.addWidget(results_label)
         
-        self.result_list = QListWidget()
-        self.result_list.setAlternatingRowColors(True)
-        self.result_list.setWordWrap(True)
-        font = QFont("Courier New", 9)
-        self.result_list.setFont(font)
-        bottom_layout.addWidget(self.result_list)
+        self.result_view = QTextEdit()
+        self.result_view.setReadOnly(True)
+        font = QFont("Courier New", 10)
+        self.result_view.setFont(font)
+        self.result_view.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        bottom_layout.addWidget(self.result_view)
         
         splitter.addWidget(bottom_widget)
         
@@ -373,15 +373,12 @@ class XQueryPanel(QWidget):
         self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('green')};")
         self.result_count_label.setText("")
         
-        self.result_list.clear()
-        if len(pretty_result) > self.MAX_RESULT_DISPLAY_LENGTH:
-            display_text = pretty_result[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
-        else:
-            display_text = pretty_result
+        display_text = pretty_result
+        if len(display_text) > self.MAX_RESULT_DISPLAY_LENGTH:
+            display_text = display_text[:self.MAX_RESULT_DISPLAY_LENGTH] + "..."
         
-        item = QListWidgetItem(display_text)
-        item.setForeground(QColor(theme.get_color('text')))
-        self.result_list.addItem(item)
+        self.result_view.setPlainText(display_text)
+        self.result_view.moveCursor(self.result_view.textCursor().Start)
     
     def apply_theme(self, theme_type):
         """Apply theme to the panel."""

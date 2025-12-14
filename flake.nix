@@ -136,15 +136,18 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        pythonWithDeps = pkgs.python3.withPackages (ps: [ saxonchePkg ps.lxml ps.pygments ]);
 
         saxonchePkg = pkgs.python3Packages.buildPythonPackage rec {
           pname = "saxonche";
           version = "12.9.0";
           format = "wheel";
 
-          src = pkgs.fetchurl {
-            url = "https://files.pythonhosted.org/packages/2f/f5/136f27f36d2d301d1f60b90e47567f8d85763c9d71073c1c32f33828d9d7/saxonche-12.9.0-cp312-cp312-manylinux_2_24_x86_64.whl";
-            sha256 = "490f30e9486750f6a066de2b467114dfd6e14d23c8ce645cad64e663f580490a";
+          src = pkgs.python3Packages.fetchPypi {
+            inherit pname version;
+            format = "wheel";
+            wheel = "saxonche-12.9.0-cp313-cp313-manylinux_2_24_x86_64.whl";
+            sha256 = "b7d295ddeae3e7c355cf53035ec47a1db301a8b9bc917636f893b56a31a48187";
           };
 
           nativeBuildInputs = [
@@ -236,7 +239,7 @@
           
           # Test XML utilities
           echo "Testing XML utilities..."
-          ${pkgs.python3}/bin/python3 -c "
+          ${pythonWithDeps}/bin/python3 -c "
 from xmleditor.xml_utils import XMLUtilities
 xml = '<?xml version=\"1.0\"?><root><child>test</child></root>'
 is_valid, msg = XMLUtilities.validate_xml(xml)
@@ -246,6 +249,18 @@ print('✓ XML validation works')
             echo "ERROR: XML utilities test failed"
             exit 1
           }
+
+          # Test XQuery engine availability (saxonche)
+          echo "Testing XQuery engine..."
+          PYTHONPATH="${xml-editor-cli}/lib/${pkgs.python3.libPrefix}/site-packages:${pythonWithDeps}/lib/${pkgs.python3.libPrefix}/site-packages" \
+          ${pythonWithDeps}/bin/python3 - <<'PY'
+from xmleditor.xml_utils import XMLUtilities
+xml = "<root><item>1</item><item>2</item></root>"
+success, msg, result = XMLUtilities.execute_xquery(xml, "//item")
+assert success, msg
+assert "<item>1</item>" in result and "<item>2</item>" in result, "XQuery output missing expected nodes"
+print("✓ XQuery engine works")
+PY
           
           # Test XPath
           echo "Testing XPath functionality..."
