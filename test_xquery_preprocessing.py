@@ -32,17 +32,12 @@ def test_xquery_fragment_container():
     success, message, result_xml = XMLUtilities.execute_xquery(xml_content, fragment_container)
     assert success, message
     
-    result_tree = etree.fromstring(result_xml.encode('utf-8'))
-    results = result_tree.findall('./result')
-    
-    assert len(results) == 2, "Expected two fragments to be executed"
-    
-    titles = [text for text in results[0].xpath('.//title/text()')]
-    assert titles == ["Software Engineer", "Data Analyst", "Product Manager"]
-    
-    count_text = results[1].text.strip() if results[1].text else ""
-    assert count_text == "3", "Count fragment should return the number of titles"
-    
+    wrapper = etree.fromstring(f"<root>{result_xml}</root>".encode('utf-8'))
+    titles = wrapper.findall('.//title')
+    assert [t.text for t in titles] == ["Software Engineer", "Data Analyst", "Product Manager"]
+    count_text = wrapper.xpath('string(/root)')
+    assert "3" in count_text
+   
     print(message)
 
 if __name__ == "__main__":

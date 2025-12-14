@@ -629,37 +629,6 @@ class XMLUtilities:
         return fragments
     
     @staticmethod
-    def _append_result_fragment(results_root: etree._Element, serialized: str, index: int) -> None:
-        """
-        Append a serialized XQuery result to the aggregated XML document.
-        """
-        result_el = etree.SubElement(results_root, "result", index=str(index))
-        if not serialized:
-            return
-        
-        # Remove XML declaration if present to allow embedding
-        cleaned = re.sub(r'^<\?xml[^>]*\?>', '', serialized.strip()).strip()
-        
-        parser = etree.XMLParser(recover=False, resolve_entities=False)
-        if cleaned.lstrip().startswith("<"):
-            try:
-                # Wrap to allow multiple top-level nodes
-                wrapper = etree.fromstringlist(
-                    [b"<wrapper>", cleaned.encode('utf-8'), b"</wrapper>"],
-                    parser=parser
-                )
-                if wrapper.text and wrapper.text.strip():
-                    result_el.text = wrapper.text.strip()
-                for child in wrapper:
-                    result_el.append(child)
-                return
-            except etree.XMLSyntaxError:
-                pass
-        
-        # Fallback to plain text if parsing fails or isn't XML
-        result_el.text = cleaned
-    
-    @staticmethod
     def execute_xquery(xml_string: str, xquery_string: str) -> Tuple[bool, str, str]:
         """
         Execute XQuery expression(s) against an XML document using Saxon/C.
@@ -684,23 +653,18 @@ class XMLUtilities:
             
             with PySaxonProcessor(license=False) as processor:
                 source_doc = processor.parse_xml(xml_text=xml_string)
-                results_root = etree.Element("xqueryResults", fragments=str(len(fragments)))
+                outputs = []
                 
                 for idx, fragment in enumerate(fragments, 1):
                     xquery_proc = processor.new_xquery_processor()
                     xquery_proc.set_context(xdm_item=source_doc)
                     xquery_proc.set_query_content(fragment)
-                    serialized = xquery_proc.run_query_to_string()
-                    XMLUtilities._append_result_fragment(results_root, serialized, idx)
+                    serialized = xquery_proc.run_query_to_string() or ""
+                    serialized = re.sub(r'^<\?xml[^>]*\?>', '', serialized).strip()
+                    outputs.append(serialized)
                 
-                result_xml = etree.tostring(
-                    results_root,
-                    encoding='utf-8',
-                    pretty_print=True,
-                    xml_declaration=True
-                ).decode('utf-8')
-                
-                return True, f"Executed {len(fragments)} fragment(s) successfully", result_xml
+                combined = "\n".join(outputs).strip()
+                return True, f"Executed {len(fragments)} fragment(s) successfully", combined
                 
         except Exception as e:
             return False, f"XQuery execution error: {str(e)}", ""

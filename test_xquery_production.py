@@ -44,8 +44,8 @@ def test_production_xquery():
     success, message, result_xml = XMLUtilities.execute_xquery(xml_content, query)
     assert success, message
     
-    result_tree = etree.fromstring(result_xml.encode('utf-8'))
-    books = result_tree.findall('.//result/expensive-books/book')
+    result_tree = etree.fromstring(f"<root>{result_xml}</root>".encode('utf-8'))
+    books = result_tree.findall('.//expensive-books/book')
     
     assert len(books) == 2, "Expected two expensive books in result document"
     titles = sorted([book.get("title") for book in books])
@@ -57,11 +57,8 @@ def test_scalar_result_wrapped_in_xml():
     success, message, result_xml = XMLUtilities.execute_xquery(xml_content, query)
     assert success, message
     
-    result_tree = etree.fromstring(result_xml.encode('utf-8'))
-    results = result_tree.findall('./result')
-    assert results, "Scalar result should still be wrapped in <result>"
-    assert "Learning XML" in results[0].text
-    assert "Harry Potter" in results[0].text
+    assert "Learning XML" in result_xml
+    assert "Harry Potter" in result_xml
 
 def test_element_construction_with_flwor():
     """Element construction with FLWOR and ordering should be preserved."""
@@ -78,11 +75,8 @@ def test_element_construction_with_flwor():
     success, message, result_xml = XMLUtilities.execute_xquery(xml_content, query)
     assert success, message
     
-    tree = etree.fromstring(result_xml.encode('utf-8'))
-    result = tree.find('./result')
-    assert result is not None
-    
-    titles_in_li = [li.xpath('string(i)') for li in result.findall('.//li')]
+    tree = etree.fromstring(f"<root>{result_xml}</root>".encode('utf-8'))
+    titles_in_li = [li.xpath('string(i)') for li in tree.findall('.//li')]
     assert titles_in_li == [
         "Everyday Italian",
         "Harry Potter",
@@ -90,7 +84,7 @@ def test_element_construction_with_flwor():
     ]
 
 def test_html_fragment_query_results_in_result_element():
-    """Top-level XQuery with constructed HTML returns inside a <result> tag without escaping."""
+    """Top-level XQuery with constructed HTML returns raw HTML (no custom wrapper)."""
     xml_books = """<?xml version="1.0"?>
 <BOOKS>
   <ITEM>
@@ -115,14 +109,11 @@ def test_html_fragment_query_results_in_result_element():
     success, message, result_xml = XMLUtilities.execute_xquery(xml_books, query)
     assert success, message
     
-    doc = etree.fromstring(result_xml.encode('utf-8'))
-    result = doc.find('./result')
-    assert result is not None, "Expected a <result> element wrapping output"
-    
-    h1 = result.find('h1')
+    doc = etree.fromstring(f"<root>{result_xml}</root>".encode('utf-8'))
+    h1 = doc.find('.//h1')
     assert h1 is not None and h1.text == "A list of books"
     
-    lis = result.findall('.//ul/li')
+    lis = doc.findall('.//ul/li')
     assert len(lis) == 2
     assert [li.xpath('string(i)') for li in lis] == ["Everyday Italian", "Learning XML"]
 

@@ -48,20 +48,18 @@ def test_xquery():
         success, message, result_xml = XMLUtilities.execute_xquery(xml_content, query)
         
         assert success, message
-        result_tree = etree.fromstring(result_xml.encode('utf-8'))
-        fragments = result_tree.findall('./result')
-        assert fragments, "Result document should contain at least one <result> element"
-        
         print(f"✓ {message}")
-        pretty = etree.tostring(result_tree, encoding='unicode', pretty_print=True)
-        print(pretty.strip())
+        print(result_xml.strip())
+        
+        parser = etree.XMLParser(resolve_entities=False, recover=False)
+        wrapped = etree.fromstring(f"<root>{result_xml}</root>".encode('utf-8'), parser=parser)
         
         if description == "Select all book titles":
-            titles = [title for title in fragments[0].xpath('.//title/text()')]
+            titles = [t for t in wrapped.xpath('.//title/text()')]
             assert titles == ["Learning XML", "Everyday Italian", "Harry Potter"]
         elif description == "Count all books":
-            counts = fragments[0].xpath('text()')
-            assert counts and counts[0].strip() == "3"
+            counts = wrapped.xpath('string(/root)')
+            assert counts.strip() == "3"
     
     print("\n" + "=" * 80)
     print("XQuery testing complete!")

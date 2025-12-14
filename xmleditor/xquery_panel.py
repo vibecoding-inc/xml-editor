@@ -368,21 +368,10 @@ class XQueryPanel(QWidget):
         theme = ThemeManager.get_theme(self.theme_type)
         
         pretty_result = result_xml.strip()
-        fragment_count = "1"
-        
-        try:
-            parser = etree.XMLParser(resolve_entities=False, recover=False)
-            result_tree = etree.fromstring(result_xml.encode('utf-8'), parser=parser)
-            fragments = result_tree.findall('./result')
-            fragment_count = str(len(fragments))
-            pretty_result = etree.tostring(result_tree, encoding='unicode', pretty_print=True)
-        except etree.XMLSyntaxError:
-            fragment_count = "1"
-            pretty_result = result_xml.strip()
         
         self.status_label.setText("Success")
         self.status_label.setStyleSheet(f"font-weight: bold; color: {theme.get_color('green')};")
-        self.result_count_label.setText(f"{fragment_count} fragment(s)")
+        self.result_count_label.setText("")
         
         self.result_list.clear()
         if len(pretty_result) > self.MAX_RESULT_DISPLAY_LENGTH:
