@@ -3,6 +3,9 @@ AI Assistant panel for the XML Editor.
 Provides an AI-powered assistant to help with XML editing tasks.
 """
 
+import html
+import re
+from lxml import etree
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton,
     QLabel, QComboBox, QScrollArea, QFrame
@@ -189,7 +192,6 @@ class AIAssistantPanel(QWidget):
             return
         
         try:
-            from lxml import etree
             root = etree.fromstring(self.xml_content.encode('utf-8'))
             
             # Gather structure information
@@ -235,7 +237,6 @@ class AIAssistantPanel(QWidget):
             return
         
         try:
-            from lxml import etree
             etree.fromstring(self.xml_content.encode('utf-8'))
             self.add_ai_message(
                 "✅ **No Errors Found**\n\n"
@@ -248,7 +249,6 @@ class AIAssistantPanel(QWidget):
             
             # Try to extract line number
             if "line" in error_msg.lower():
-                import re
                 line_match = re.search(r'line (\d+)', error_msg)
             
             suggestions = self.get_error_suggestions(error_msg)
@@ -298,7 +298,6 @@ class AIAssistantPanel(QWidget):
             return
         
         try:
-            from lxml import etree
             root = etree.fromstring(self.xml_content.encode('utf-8'))
             
             suggestions = []
@@ -402,8 +401,10 @@ class AIAssistantPanel(QWidget):
     
     def general_response(self, message):
         """Provide a general response."""
+        # Truncate and escape user message for safe display
+        truncated_msg = message[:50] if len(message) > 50 else message
         self.add_ai_message(
-            f"🤔 I received your message about: \"{message[:50]}...\"\n\n"
+            f"🤔 I received your message about: \"{truncated_msg}...\"\n\n"
             "I'm here to help with XML-related tasks. Try:\n"
             "• 'Explain this XML'\n"
             "• 'Check for errors'\n"
@@ -415,15 +416,18 @@ class AIAssistantPanel(QWidget):
     def add_user_message(self, message):
         """Add a user message to the chat display."""
         current_text = self.chat_display.toHtml()
-        user_html = f'<p style="color: #0066cc; margin: 5px 0;"><b>You:</b> {message}</p>'
+        # HTML-escape user message to prevent XSS
+        escaped_message = html.escape(message)
+        user_html = f'<p style="color: #0066cc; margin: 5px 0;"><b>You:</b> {escaped_message}</p>'
         self.chat_display.setHtml(current_text + user_html)
         self.scroll_to_bottom()
     
     def add_ai_message(self, message):
         """Add an AI message to the chat display."""
         current_text = self.chat_display.toHtml()
-        # Convert markdown-like formatting to HTML
-        formatted = message.replace('\n', '<br>')
+        # HTML-escape message to prevent XSS, then convert newlines to breaks
+        escaped_message = html.escape(message)
+        formatted = escaped_message.replace('\n', '<br>')
         ai_html = f'<p style="color: #333333; margin: 5px 0; background-color: #f5f5f5; padding: 8px; border-radius: 5px;"><b>🤖 AI:</b><br>{formatted}</p>'
         self.chat_display.setHtml(current_text + ai_html)
         self.scroll_to_bottom()
