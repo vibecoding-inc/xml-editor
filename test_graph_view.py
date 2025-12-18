@@ -1,12 +1,30 @@
 #!/usr/bin/env python3
 """
 Test script to verify XML graph view functionality.
+Skips gracefully when Qt dependencies are unavailable.
 """
 
 import sys
 import os
+import unittest
 
-# Test the graph view components in isolation (without Qt)
+_QT_AVAILABLE = None
+SKIP_REASON = "Qt dependencies unavailable; skipping graph view tests."
+
+
+def _qt_available():
+    """Return True if Qt libraries can be imported (cached)."""
+    global _QT_AVAILABLE
+    if _QT_AVAILABLE is not None:
+        return _QT_AVAILABLE
+    try:
+        from PyQt6.QtWidgets import QApplication  # noqa: F401
+        _QT_AVAILABLE = True
+    except ImportError:
+        _QT_AVAILABLE = False
+    return _QT_AVAILABLE
+
+@unittest.skipIf(not _qt_available(), SKIP_REASON)
 def test_constants():
     """Test that constants are defined."""
     from xmleditor.xml_graph_view import TEXT_PREVIEW_LENGTH, TOOLTIP_TEXT_LENGTH
@@ -19,6 +37,7 @@ def test_constants():
     print("  Constants defined correctly")
 
 
+@unittest.skipIf(not _qt_available(), SKIP_REASON)
 def test_module_imports():
     """Test that all classes can be imported."""
     try:
@@ -33,6 +52,7 @@ def test_module_imports():
         return False
 
 
+@unittest.skipIf(not _qt_available(), SKIP_REASON)
 def test_graph_scene_with_qt():
     """Test graph scene with Qt (requires QApplication)."""
     try:
@@ -79,6 +99,7 @@ def test_graph_scene_with_qt():
         return False
 
 
+@unittest.skipIf(not _qt_available(), SKIP_REASON)
 def test_namespace_handling():
     """Test namespace handling in graph scene."""
     try:
@@ -123,10 +144,13 @@ if __name__ == "__main__":
     print("=" * 60)
     print()
     
-    # Set Qt platform for headless testing
-    os.environ['QT_QPA_PLATFORM'] = 'offscreen'
-    
     try:
+        if not _qt_available():
+            raise unittest.SkipTest(SKIP_REASON)
+
+        # Set Qt platform for headless testing once we know Qt is available
+        os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+
         print("Testing constants...")
         test_constants()
         
@@ -143,6 +167,8 @@ if __name__ == "__main__":
         print("=" * 60)
         print("All graph view tests passed! ✓")
         print("=" * 60)
+    except unittest.SkipTest:
+        print(f"\n{SKIP_REASON}\n")
     except Exception as e:
         print(f"\nTest failed: {e}")
         import traceback
