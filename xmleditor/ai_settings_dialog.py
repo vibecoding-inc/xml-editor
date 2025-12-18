@@ -9,7 +9,8 @@ import urllib.error
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
-    QPushButton, QLabel, QGroupBox, QMessageBox, QComboBox, QApplication
+    QPushButton, QLabel, QGroupBox, QMessageBox, QComboBox, QApplication,
+    QCheckBox
 )
 from PyQt6.QtCore import Qt
 
@@ -38,6 +39,7 @@ class AISettingsManager:
             "api_url": self.DEFAULT_API_URL,
             "api_key": "",
             "model": self.DEFAULT_MODEL,
+            "enter_sends_message": True,  # True = Enter sends, Shift+Enter newline
         }
         
         if self.config_file.exists():
@@ -159,6 +161,20 @@ class AISettingsDialog(QDialog):
         
         layout.addWidget(api_group)
         
+        # Behavior Settings Group
+        behavior_group = QGroupBox("Behavior")
+        behavior_layout = QFormLayout(behavior_group)
+        
+        # Enter key behavior
+        self.enter_sends_checkbox = QCheckBox("Enter sends message (Shift+Enter for newline)")
+        self.enter_sends_checkbox.setToolTip(
+            "When checked, pressing Enter sends the message and Shift+Enter adds a newline.\n"
+            "When unchecked, pressing Enter adds a newline and Shift+Enter sends the message."
+        )
+        behavior_layout.addRow(self.enter_sends_checkbox)
+        
+        layout.addWidget(behavior_group)
+        
         # Info label
         info_label = QLabel(
             "💡 Settings are stored in ~/.config/xml-editor/ai_settings.json\n"
@@ -216,6 +232,7 @@ class AISettingsDialog(QDialog):
         self.api_url_input.setText(settings.get("api_url", ""))
         self.api_key_input.setText(settings.get("api_key", ""))
         self.model_input.setCurrentText(settings.get("model", "openai/gpt-3.5-turbo"))
+        self.enter_sends_checkbox.setChecked(settings.get("enter_sends_message", True))
         
         # Set preset based on URL
         current_url = settings.get("api_url", "")
@@ -235,6 +252,7 @@ class AISettingsDialog(QDialog):
             "api_url": self.api_url_input.text().strip(),
             "api_key": self.api_key_input.text().strip(),
             "model": self.model_input.currentText().strip(),
+            "enter_sends_message": self.enter_sends_checkbox.isChecked(),
         }
         
         if not settings["api_url"]:

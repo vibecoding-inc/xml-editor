@@ -11,12 +11,172 @@ import urllib.error
 from lxml import etree
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton,
-    QLabel, QComboBox, QScrollArea, QFrame, QApplication
+    QLabel, QComboBox, QScrollArea, QFrame, QApplication, QTextBrowser
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot, QEvent
+from PyQt6.QtGui import QFont, QKeyEvent
 
 from xmleditor.ai_settings_dialog import AISettingsManager, AISettingsDialog
+
+
+class ChatInputTextEdit(QTextEdit):
+    """Custom QTextEdit that handles Enter key for sending messages."""
+    
+    send_message = pyqtSignal()
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.enter_sends = True  # Default: Enter sends, Shift+Enter for newline
+    
+    def set_enter_sends(self, enabled):
+        """Set whether Enter key sends the message."""
+        self.enter_sends = enabled
+    
+    def keyPressEvent(self, event: QKeyEvent):
+        """Handle key press events."""
+        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            if self.enter_sends:
+                # Enter sends, Shift+Enter adds newline
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    super().keyPressEvent(event)
+                else:
+                    self.send_message.emit()
+            else:
+                # Shift+Enter sends, Enter adds newline
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    self.send_message.emit()
+                else:
+                    super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
+
+
+class MarkdownRenderer:
+    """Renders markdown text to HTML with support for code blocks and mermaid diagrams."""
+    
+    # CSS styles for markdown rendering
+    STYLES = """
+    <style>
+        .ai-message { color: #333333; margin: 5px 0; background-color: #f5f5f5; padding: 8px; border-radius: 5px; }
+        .user-message { color: #0066cc; margin: 5px 0; }
+        .code-block { background-color: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; 
+                      font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; overflow-x: auto; 
+                      white-space: pre-wrap; word-wrap: break-word; }
+        .code-block-xml { background-color: #1e3a5f; }
+        .code-block-mermaid { background-color: #f0f4f8; color: #333; border: 1px solid #ccd; }
+        .inline-code { background-color: #e8e8e8; padding: 2px 5px; border-radius: 3px; 
+                       font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; }
+        .mermaid-container { background-color: #ffffff; padding: 10px; border-radius: 4px; 
+                             border: 1px solid #ddd; margin: 5px 0; }
+        .mermaid-placeholder { color: #666; font-style: italic; padding: 10px; 
+                               background-color: #f9f9f9; border-radius: 4px; }
+        h1, h2, h3, h4 { margin: 10px 0 5px 0; }
+        ul, ol { margin: 5px 0; padding-left: 20px; }
+        li { margin: 2px 0; }
+        blockquote { border-left: 3px solid #ccc; margin: 5px 0; padding-left: 10px; color: #666; }
+        strong { font-weight: bold; }
+        em { font-style: italic; }
+    </style>
+    """
+    
+    @classmethod
+    def render(cls, text, is_user=False):
+        """Render markdown text to HTML."""
+        if is_user:
+            escaped = html.escape(text)
+            return f'<p class="user-message"><b>You:</b> {escaped}</p>'
+        
+        # Process the text
+        result = cls._process_markdown(text)
+        return f'<div class="ai-message"><b>🤖 AI:</b><br>{result}</div>'
+    
+    @classmethod
+    def _process_markdown(cls, text):
+        """Process markdown syntax and return HTML."""
+        # First, extract and protect code blocks
+        code_blocks = []
+        
+        def save_code_block(match):
+            language = match.group(1) or ''
+            code = match.group(2)
+            index = len(code_blocks)
+            code_blocks.append((language.lower(), code))
+            return f'%%CODEBLOCK_{index}%%'
+        
+        # Match fenced code blocks with optional language
+        text = re.sub(r'```(\w*)\n?(.*?)```', save_code_block, text, flags=re.DOTALL)
+        
+        # Escape HTML in remaining text
+        text = html.escape(text)
+        
+        # Process inline code (backticks)
+        text = re.sub(r'`([^`]+)`', r'<span class="inline-code">\1</span>', text)
+        
+        # Process headers
+        text = re.sub(r'^#### (.+)$', r'<h4>\1</h4>', text, flags=re.MULTILINE)
+        text = re.sub(r'^### (.+)$', r'<h3>\1</h3>', text, flags=re.MULTILINE)
+        text = re.sub(r'^## (.+)$', r'<h2>\1</h2>', text, flags=re.MULTILINE)
+        text = re.sub(r'^# (.+)$', r'<h1>\1</h1>', text, flags=re.MULTILINE)
+        
+        # Process bold and italic
+        text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text)
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+        text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
+        text = re.sub(r'_(.+?)_', r'<em>\1</em>', text)
+        
+        # Process blockquotes
+        text = re.sub(r'^&gt; (.+)$', r'<blockquote>\1</blockquote>', text, flags=re.MULTILINE)
+        
+        # Process unordered lists (• and - and *)
+        text = re.sub(r'^[\s]*[•\-\*] (.+)$', r'<li>\1</li>', text, flags=re.MULTILINE)
+        
+        # Wrap consecutive <li> items in <ul>
+        text = re.sub(r'((?:<li>.*?</li>\n?)+)', r'<ul>\1</ul>', text)
+        
+        # Process numbered lists
+        text = re.sub(r'^[\s]*(\d+)\. (.+)$', r'<li>\2</li>', text, flags=re.MULTILINE)
+        
+        # Convert newlines to <br> (but not inside block elements)
+        text = text.replace('\n', '<br>\n')
+        
+        # Clean up excessive <br> tags around block elements
+        text = re.sub(r'<br>\n*(</?(?:ul|ol|li|h[1-4]|blockquote|div|p)>)', r'\1', text)
+        text = re.sub(r'(</(?:ul|ol|h[1-4]|blockquote|div|p)>)\n*<br>', r'\1', text)
+        
+        # Restore code blocks with proper rendering
+        for i, (language, code) in enumerate(code_blocks):
+            rendered_block = cls._render_code_block(language, code)
+            text = text.replace(f'%%CODEBLOCK_{i}%%', rendered_block)
+        
+        return text
+    
+    @classmethod
+    def _render_code_block(cls, language, code):
+        """Render a code block with syntax highlighting indication."""
+        escaped_code = html.escape(code.strip())
+        
+        if language == 'mermaid':
+            # Mermaid diagram - show as a styled block with the diagram code
+            # In the future, this could be rendered as an actual diagram
+            return (
+                f'<div class="mermaid-container">'
+                f'<div style="color: #666; font-size: 10px; margin-bottom: 5px;">📊 Mermaid Diagram:</div>'
+                f'<pre class="code-block code-block-mermaid">{escaped_code}</pre>'
+                f'</div>'
+            )
+        elif language in ('xml', 'html', 'xsd', 'xslt', 'dtd'):
+            # XML-family languages with special styling
+            return f'<pre class="code-block code-block-xml">{escaped_code}</pre>'
+        else:
+            # Generic code block
+            lang_label = f'<div style="color: #888; font-size: 10px; margin-bottom: 3px;">{language}</div>' if language else ''
+            return f'{lang_label}<pre class="code-block">{escaped_code}</pre>'
+    
+    @classmethod
+    def get_styles(cls):
+        """Return the CSS styles for the chat display."""
+        return cls.STYLES
 
 
 class AIWorkerThread(QThread):
@@ -169,9 +329,10 @@ The user is currently working with an XML document in the editor."""
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(separator)
         
-        # Chat history display area
-        self.chat_display = QTextEdit()
+        # Chat history display area - use QTextBrowser for better HTML rendering
+        self.chat_display = QTextBrowser()
         self.chat_display.setReadOnly(True)
+        self.chat_display.setOpenExternalLinks(False)
         self.chat_display.setPlaceholderText(
             "AI Assistant is ready to help!\n\n"
             "• Click a quick action button above\n"
@@ -181,14 +342,20 @@ The user is currently working with an XML document in the editor."""
             "• 'Add a new child element called <item>'\n"
             "• 'Convert to a different namespace'"
         )
+        # Initialize with styles
+        self.chat_html_content = MarkdownRenderer.get_styles()
         layout.addWidget(self.chat_display, 1)
         
         # User input area
         input_layout = QHBoxLayout()
         
-        self.user_input = QTextEdit()
-        self.user_input.setPlaceholderText("Ask AI about your XML...")
+        self.user_input = ChatInputTextEdit()
+        self.user_input.setPlaceholderText("Ask AI about your XML... (Enter to send, Shift+Enter for newline)")
         self.user_input.setMaximumHeight(60)
+        self.user_input.send_message.connect(self.send_message)
+        # Load enter key preference
+        enter_sends = self.settings_manager.load_settings().get("enter_sends_message", True)
+        self.user_input.set_enter_sends(enter_sends)
         input_layout.addWidget(self.user_input)
         
         self.send_btn = QPushButton("Send")
@@ -235,6 +402,14 @@ The user is currently working with an XML document in the editor."""
         if dialog.exec():
             # Settings were saved, reload them
             self.settings_manager.reload_settings()
+            # Update enter key behavior
+            enter_sends = self.settings_manager.load_settings().get("enter_sends_message", True)
+            self.user_input.set_enter_sends(enter_sends)
+            # Update placeholder text
+            if enter_sends:
+                self.user_input.setPlaceholderText("Ask AI about your XML... (Enter to send, Shift+Enter for newline)")
+            else:
+                self.user_input.setPlaceholderText("Ask AI about your XML... (Shift+Enter to send, Enter for newline)")
             self.add_ai_message("✅ Settings saved! AI assistant is now configured.")
     
     def call_ai_api(self, user_message, context_info=""):
@@ -337,6 +512,12 @@ The user is currently working with an XML document in the editor."""
     
     def quick_action(self, action_type):
         """Handle quick action button clicks."""
+        # Generate action works differently - it pre-fills the input
+        if action_type == "generate":
+            self.user_input.setPlaceholderText("Describe the XML you want to generate...")
+            self.user_input.setFocus()
+            return
+        
         if not self.xml_content.strip():
             self.add_ai_message(
                 "⚠️ No XML content found. Please load or create an XML document first."
@@ -365,15 +546,6 @@ The user is currently working with an XML document in the editor."""
                     "Please analyze this XML document and suggest optimizations or improvements. "
                     "Consider structure, readability, efficiency, and best practices."
                 )
-            elif action_type == "generate":
-                self.add_user_message("Help me generate XML content")
-                self.add_ai_message(
-                    "📝 I can help you generate XML content. Please describe what you need:\n\n"
-                    "Examples:\n"
-                    "• 'Create a person element with name and age'\n"
-                    "• 'Add a list of products with id, name, and price'\n"
-                    "• 'Generate an RSS feed structure'"
-                )
         else:
             # Fallback to local analysis
             if action_type == "explain":
@@ -385,16 +557,6 @@ The user is currently working with an XML document in the editor."""
             elif action_type == "optimize":
                 self.add_user_message("Suggest optimizations")
                 self.suggest_optimizations_local()
-            elif action_type == "generate":
-                self.add_user_message("Help me generate XML content")
-                self.add_ai_message(
-                    "📝 I can help you generate XML content. Please describe what you need:\n\n"
-                    "Examples:\n"
-                    "• 'Create a person element with name and age'\n"
-                    "• 'Add a list of products with id, name, and price'\n"
-                    "• 'Generate an RSS feed structure'\n\n"
-                    "💡 Configure API settings (⚙️) for AI-powered generation!"
-                )
     
     def send_message(self):
         """Send user message and get AI response."""
@@ -662,21 +824,16 @@ The user is currently working with an XML document in the editor."""
     
     def add_user_message(self, message):
         """Add a user message to the chat display."""
-        current_text = self.chat_display.toHtml()
-        # HTML-escape user message to prevent XSS
-        escaped_message = html.escape(message)
-        user_html = f'<p style="color: #0066cc; margin: 5px 0;"><b>You:</b> {escaped_message}</p>'
-        self.chat_display.setHtml(current_text + user_html)
+        user_html = MarkdownRenderer.render(message, is_user=True)
+        self.chat_html_content += user_html
+        self.chat_display.setHtml(self.chat_html_content)
         self.scroll_to_bottom()
     
     def add_ai_message(self, message):
         """Add an AI message to the chat display."""
-        current_text = self.chat_display.toHtml()
-        # HTML-escape message to prevent XSS, then convert newlines to breaks
-        escaped_message = html.escape(message)
-        formatted = escaped_message.replace('\n', '<br>')
-        ai_html = f'<p style="color: #333333; margin: 5px 0; background-color: #f5f5f5; padding: 8px; border-radius: 5px;"><b>🤖 AI:</b><br>{formatted}</p>'
-        self.chat_display.setHtml(current_text + ai_html)
+        ai_html = MarkdownRenderer.render(message, is_user=False)
+        self.chat_html_content += ai_html
+        self.chat_display.setHtml(self.chat_html_content)
         self.scroll_to_bottom()
     
     def scroll_to_bottom(self):
@@ -686,6 +843,7 @@ The user is currently working with an XML document in the editor."""
     
     def clear_chat(self):
         """Clear the chat history."""
+        self.chat_html_content = MarkdownRenderer.get_styles()
         self.chat_display.clear()
         self.add_ai_message(
             "👋 Chat cleared! I'm ready to help with your XML editing tasks."
