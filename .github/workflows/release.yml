@@ -63,9 +63,6 @@ jobs:
             accept-flake-config = true
             extra-platforms = ${{ matrix.system }}
       
-      - name: Set up Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-      
       - name: Set up QEMU for cross-compilation
         if: matrix.system == 'aarch64-linux'
         uses: docker/setup-qemu-action@v3
