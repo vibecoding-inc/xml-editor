@@ -8,6 +8,7 @@ import re
 import json
 import urllib.request
 import urllib.error
+import base64
 from lxml import etree
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton,
@@ -17,6 +18,64 @@ from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot, QEvent
 from PyQt6.QtGui import QFont, QKeyEvent
 
 from xmleditor.ai_settings_dialog import AISettingsManager, AISettingsDialog
+
+# Try to import mermaid-py for diagram rendering
+try:
+    from mermaid import Mermaid
+    MERMAID_AVAILABLE = True
+except ImportError:
+    MERMAID_AVAILABLE = False
+
+
+class MermaidRenderer:
+    """Renders mermaid diagram code to SVG images."""
+    
+    # Cache for rendered diagrams to avoid redundant API calls
+    _cache = {}
+    
+    @classmethod
+    def is_available(cls):
+        """Check if mermaid rendering is available."""
+        return MERMAID_AVAILABLE
+    
+    @classmethod
+    def render_to_svg(cls, mermaid_code):
+        """
+        Render mermaid code to SVG string.
+        
+        Args:
+            mermaid_code: The mermaid diagram code to render
+            
+        Returns:
+            tuple: (success: bool, result: str) where result is SVG content on success
+                   or error message on failure
+        """
+        if not MERMAID_AVAILABLE:
+            return False, "mermaid-py is not installed"
+        
+        # Check cache first
+        cache_key = mermaid_code.strip()
+        if cache_key in cls._cache:
+            return True, cls._cache[cache_key]
+        
+        try:
+            diagram = Mermaid(mermaid_code)
+            response = diagram.svg_response
+            
+            if response.status_code == 200:
+                svg_content = response.text
+                # Cache the result
+                cls._cache[cache_key] = svg_content
+                return True, svg_content
+            else:
+                return False, f"Failed to render diagram (HTTP {response.status_code})"
+        except Exception as e:
+            return False, f"Error rendering mermaid diagram: {str(e)}"
+    
+    @classmethod
+    def clear_cache(cls):
+        """Clear the diagram cache."""
+        cls._cache.clear()
 
 
 class ChatInputTextEdit(QTextEdit):
@@ -179,14 +238,33 @@ class MarkdownRenderer:
         escaped_code = html.escape(code.strip())
         
         if language == 'mermaid':
-            # Mermaid diagram - show as a styled block with the diagram code
-            # In the future, this could be rendered as an actual diagram
-            return (
-                f'<div class="mermaid-container">'
-                f'<div style="color: #666; font-size: 10px; margin-bottom: 5px;">📊 Mermaid Diagram:</div>'
-                f'<pre class="code-block code-block-mermaid">{escaped_code}</pre>'
-                f'</div>'
-            )
+            # Mermaid diagram - try to render as SVG
+            if MermaidRenderer.is_available():
+                success, result = MermaidRenderer.render_to_svg(code.strip())
+                if success:
+                    # Successfully rendered to SVG - display the diagram
+                    return (
+                        f'<div class="mermaid-container">'
+                        f'<div style="color: #666; font-size: 10px; margin-bottom: 5px;">📊 Mermaid Diagram:</div>'
+                        f'{result}'
+                        f'</div>'
+                    )
+                else:
+                    # Rendering failed - show error and code
+                    return (
+                        f'<div class="mermaid-container">'
+                        f'<div style="color: #cc6600; font-size: 10px; margin-bottom: 5px;">⚠️ Mermaid Diagram (render failed: {html.escape(result)}):</div>'
+                        f'<pre class="code-block code-block-mermaid">{escaped_code}</pre>'
+                        f'</div>'
+                    )
+            else:
+                # mermaid-py not available - show code with note
+                return (
+                    f'<div class="mermaid-container">'
+                    f'<div style="color: #666; font-size: 10px; margin-bottom: 5px;">📊 Mermaid Diagram (install mermaid-py to render):</div>'
+                    f'<pre class="code-block code-block-mermaid">{escaped_code}</pre>'
+                    f'</div>'
+                )
         elif language in ('xml', 'html', 'xsd', 'xslt', 'dtd'):
             # XML-family languages with special styling
             return f'<pre class="code-block code-block-xml">{escaped_code}</pre>'
