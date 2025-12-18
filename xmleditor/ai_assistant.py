@@ -8,6 +8,7 @@ import re
 import json
 import urllib.request
 import urllib.error
+from collections import OrderedDict
 from lxml import etree
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton,
@@ -17,6 +18,156 @@ from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot, QEvent
 from PyQt6.QtGui import QFont, QKeyEvent
 
 from xmleditor.ai_settings_dialog import AISettingsManager, AISettingsDialog
+
+# Try to import mermaid-py for diagram rendering
+try:
+    from mermaid import Mermaid
+    MERMAID_AVAILABLE = True
+except ImportError:
+    MERMAID_AVAILABLE = False
+
+
+class MermaidRenderer:
+    """Renders mermaid diagram code to SVG images."""
+    
+    # LRU cache for rendered diagrams with size limit
+    _cache = OrderedDict()
+    _max_cache_size = 50  # Maximum number of cached diagrams
+    
+    # Allowed SVG elements for sanitization (whitelist approach)
+    _ALLOWED_SVG_ELEMENTS = frozenset([
+        'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline',
+        'polygon', 'text', 'tspan', 'textpath', 'defs', 'use', 'symbol',
+        'clippath', 'mask', 'pattern', 'lineargradient', 'radialgradient',
+        'stop', 'marker', 'title', 'desc', 'style', 'foreignobject', 'image'
+    ])
+    
+    # Allowed SVG attributes (whitelist approach)
+    _ALLOWED_SVG_ATTRS = frozenset([
+        'id', 'class', 'style', 'width', 'height', 'viewbox', 'xmlns',
+        'xmlns:xlink', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r',
+        'rx', 'ry', 'points', 'd', 'fill', 'stroke', 'stroke-width',
+        'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap',
+        'stroke-linejoin', 'opacity', 'fill-opacity', 'stroke-opacity',
+        'transform', 'font-family', 'font-size', 'font-weight', 'font-style',
+        'text-anchor', 'dominant-baseline', 'alignment-baseline', 'dy', 'dx',
+        'xlink:href', 'href', 'clip-path', 'mask', 'marker-start', 'marker-mid',
+        'marker-end', 'gradientunits', 'gradienttransform', 'spreadmethod',
+        'offset', 'stop-color', 'stop-opacity', 'patternunits', 'patterntransform',
+        'role', 'aria-roledescription', 'aria-label', 'aria-hidden',
+        'preserveaspectratio', 'overflow', 'visibility', 'display'
+    ])
+    
+    @classmethod
+    def is_available(cls):
+        """Check if mermaid rendering is available."""
+        return MERMAID_AVAILABLE
+    
+    @classmethod
+    def _sanitize_svg(cls, svg_content):
+        """
+        Sanitize SVG content to prevent XSS attacks.
+        Removes potentially dangerous elements and attributes.
+        
+        Args:
+            svg_content: Raw SVG string
+            
+        Returns:
+            Sanitized SVG string
+        """
+        try:
+            # Parse the SVG
+            parser = etree.XMLParser(remove_comments=True, resolve_entities=False)
+            root = etree.fromstring(svg_content.encode('utf-8'), parser)
+            
+            # Recursively sanitize elements
+            cls._sanitize_element(root)
+            
+            # Return sanitized SVG
+            return etree.tostring(root, encoding='unicode')
+        except Exception:
+            # If parsing fails, return empty SVG to be safe
+            return '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    
+    @classmethod
+    def _sanitize_element(cls, element):
+        """Recursively sanitize an SVG element and its children."""
+        # Get local name without namespace
+        local_name = element.tag.split('}')[-1].lower() if '}' in element.tag else element.tag.lower()
+        
+        # Remove disallowed elements
+        children_to_remove = []
+        for child in element:
+            child_local_name = child.tag.split('}')[-1].lower() if '}' in child.tag else child.tag.lower()
+            if child_local_name not in cls._ALLOWED_SVG_ELEMENTS:
+                children_to_remove.append(child)
+            else:
+                cls._sanitize_element(child)
+        
+        for child in children_to_remove:
+            element.remove(child)
+        
+        # Remove disallowed attributes and dangerous patterns
+        attrs_to_remove = []
+        for attr in element.attrib:
+            attr_local = attr.split('}')[-1].lower() if '}' in attr else attr.lower()
+            value = element.attrib[attr].lower()
+            
+            # Remove if not in whitelist
+            if attr_local not in cls._ALLOWED_SVG_ATTRS:
+                attrs_to_remove.append(attr)
+            # Remove javascript: URLs and event handlers
+            elif 'javascript:' in value or attr_local.startswith('on'):
+                attrs_to_remove.append(attr)
+        
+        for attr in attrs_to_remove:
+            del element.attrib[attr]
+    
+    @classmethod
+    def render_to_svg(cls, mermaid_code):
+        """
+        Render mermaid code to SVG string.
+        
+        Args:
+            mermaid_code: The mermaid diagram code to render
+            
+        Returns:
+            tuple: (success: bool, result: str) where result is SVG content on success
+                   or error message on failure
+        """
+        if not MERMAID_AVAILABLE:
+            return False, "mermaid-py is not installed"
+        
+        # Check cache first (LRU: move to end if found)
+        cache_key = mermaid_code.strip()
+        if cache_key in cls._cache:
+            cls._cache.move_to_end(cache_key)
+            return True, cls._cache[cache_key]
+        
+        try:
+            diagram = Mermaid(mermaid_code)
+            response = diagram.svg_response
+            
+            if response.status_code == 200:
+                svg_content = response.text
+                # Sanitize SVG to prevent XSS
+                sanitized_svg = cls._sanitize_svg(svg_content)
+                
+                # Add to cache with LRU eviction
+                cls._cache[cache_key] = sanitized_svg
+                if len(cls._cache) > cls._max_cache_size:
+                    cls._cache.popitem(last=False)  # Remove oldest
+                
+                return True, sanitized_svg
+            else:
+                return False, f"Failed to render diagram (HTTP {response.status_code})"
+        except Exception as e:
+            return False, f"Error rendering mermaid diagram: {str(e)}"
+    
+    @classmethod
+    def clear_cache(cls):
+        """Clear the diagram cache."""
+        cls._cache.clear()
 
 
 class ChatInputTextEdit(QTextEdit):
@@ -179,14 +330,33 @@ class MarkdownRenderer:
         escaped_code = html.escape(code.strip())
         
         if language == 'mermaid':
-            # Mermaid diagram - show as a styled block with the diagram code
-            # In the future, this could be rendered as an actual diagram
-            return (
-                f'<div class="mermaid-container">'
-                f'<div style="color: #666; font-size: 10px; margin-bottom: 5px;">📊 Mermaid Diagram:</div>'
-                f'<pre class="code-block code-block-mermaid">{escaped_code}</pre>'
-                f'</div>'
-            )
+            # Mermaid diagram - try to render as SVG
+            if MermaidRenderer.is_available():
+                success, result = MermaidRenderer.render_to_svg(code.strip())
+                if success:
+                    # Successfully rendered to SVG - display the diagram
+                    return (
+                        f'<div class="mermaid-container">'
+                        f'<div style="color: #666; font-size: 10px; margin-bottom: 5px;">📊 Mermaid Diagram:</div>'
+                        f'{result}'
+                        f'</div>'
+                    )
+                else:
+                    # Rendering failed - show error and code
+                    return (
+                        f'<div class="mermaid-container">'
+                        f'<div style="color: #cc6600; font-size: 10px; margin-bottom: 5px;">⚠️ Mermaid Diagram (render failed: {html.escape(result)}):</div>'
+                        f'<pre class="code-block code-block-mermaid">{escaped_code}</pre>'
+                        f'</div>'
+                    )
+            else:
+                # mermaid-py not available - show code with note
+                return (
+                    f'<div class="mermaid-container">'
+                    f'<div style="color: #666; font-size: 10px; margin-bottom: 5px;">📊 Mermaid Diagram (install mermaid-py to render):</div>'
+                    f'<pre class="code-block code-block-mermaid">{escaped_code}</pre>'
+                    f'</div>'
+                )
         elif language in ('xml', 'html', 'xsd', 'xslt', 'dtd'):
             # XML-family languages with special styling
             return f'<pre class="code-block code-block-xml">{escaped_code}</pre>'
