@@ -6,6 +6,9 @@ Test script to verify XML graph view functionality.
 import sys
 import os
 
+# Ensure Qt uses offscreen platform for headless testing
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 # Test the graph view components in isolation (without Qt)
 def test_constants():
     """Test that constants are defined."""
@@ -122,9 +125,6 @@ if __name__ == "__main__":
     print("XML Editor - Graph View Tests")
     print("=" * 60)
     print()
-    
-    # Set Qt platform for headless testing
-    os.environ['QT_QPA_PLATFORM'] = 'offscreen'
     
     try:
         print("Testing constants...")
