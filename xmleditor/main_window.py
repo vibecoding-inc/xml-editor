@@ -21,6 +21,7 @@ from xmleditor.xslt_dialog import XSLTDialog
 from xmleditor.schema_generation_dialog import SchemaGenerationDialog
 from xmleditor.xml_utils import XMLUtilities
 from xmleditor.theme_manager import ThemeManager, ThemeType
+from xmleditor.ai_assistant import AIAssistantPanel
 
 
 class MainWindow(QMainWindow):
@@ -103,6 +104,9 @@ class MainWindow(QMainWindow):
         
         # Create XSLT panel as dock widget
         self.create_xslt_panel()
+        
+        # Create AI Assistant panel as dock widget
+        self.create_ai_assistant_panel()
         
         # Create menu bar
         self.create_menu_bar()
@@ -295,6 +299,12 @@ class MainWindow(QMainWindow):
         toggle_xslt_action.triggered.connect(self.toggle_xslt_panel)
         view_menu.addAction(toggle_xslt_action)
         
+        toggle_ai_action = QAction("Toggle &AI Assistant", self)
+        toggle_ai_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
+        toggle_ai_action.setStatusTip("Toggle AI Assistant panel")
+        toggle_ai_action.triggered.connect(self.toggle_ai_assistant_panel)
+        view_menu.addAction(toggle_ai_action)
+        
         view_menu.addSeparator()
         
         word_wrap_action = QAction("Word &Wrap", self)
@@ -386,6 +396,11 @@ class MainWindow(QMainWindow):
         graph_action.setStatusTip("Toggle XML node graph visualization")
         graph_action.triggered.connect(self.toggle_graph_panel)
         toolbar.addAction(graph_action)
+        
+        ai_action = QAction("🤖 AI", self)
+        ai_action.setStatusTip("Toggle AI Assistant panel")
+        ai_action.triggered.connect(self.toggle_ai_assistant_panel)
+        toolbar.addAction(ai_action)
         
     def create_status_bar(self):
         """Create status bar."""
@@ -719,6 +734,18 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.xslt_dock)
         self.xslt_dock.hide()
     
+    def create_ai_assistant_panel(self):
+        """Create AI Assistant panel as a dock widget."""
+        self.ai_dock = QDockWidget("AI Assistant", self)
+        self.ai_dock.setObjectName("AIDock")
+        
+        # Create AI Assistant panel
+        self.ai_assistant = AIAssistantPanel()
+        
+        self.ai_dock.setWidget(self.ai_assistant)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_dock)
+        self.ai_dock.hide()
+    
     def _create_separator(self):
         """Create a vertical separator line."""
         separator = QFrame()
@@ -818,6 +845,9 @@ class MainWindow(QMainWindow):
             # Refresh graph view if visible
             if self.graph_dock.isVisible():
                 self.refresh_graph_view()
+            # Update AI assistant context if visible
+            if self.ai_dock.isVisible():
+                self.update_ai_assistant_context()
     
     def close_tab(self, index):
         """Close a tab."""
@@ -1504,6 +1534,23 @@ class MainWindow(QMainWindow):
             self.xslt_dock.hide()
         else:
             self.xslt_dock.show()
+    
+    def toggle_ai_assistant_panel(self):
+        """Toggle AI Assistant panel visibility."""
+        if self.ai_dock.isVisible():
+            self.ai_dock.hide()
+        else:
+            self.ai_dock.show()
+            self.update_ai_assistant_context()
+    
+    def update_ai_assistant_context(self):
+        """Update AI Assistant with current editor content."""
+        editor = self.get_current_editor()
+        if editor:
+            content = editor.get_text().strip()
+            self.ai_assistant.set_xml_content(content)
+        else:
+            self.ai_assistant.set_xml_content("")
     
     def refresh_graph_view(self):
         """Refresh the XML graph view."""
