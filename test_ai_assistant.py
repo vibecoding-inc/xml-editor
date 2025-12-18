@@ -8,8 +8,11 @@ from unittest.mock import MagicMock, patch
 from xmleditor.ai_assistant import AIAssistantPanel, MarkdownRenderer
 
 
-# Test XML content
-xml_content = """<?xml version="1.0" encoding="UTF-8"?>
+class TestAIAssistantAgenticFeatures:
+    """Test AI Assistant agentic capabilities."""
+    
+    # Test XML content as a class constant for reusability
+    TEST_XML_CONTENT = """<?xml version="1.0" encoding="UTF-8"?>
 <bookstore>
     <book category="web">
         <title lang="en">Learning XML</title>
@@ -24,10 +27,6 @@ xml_content = """<?xml version="1.0" encoding="UTF-8"?>
         <price>30.00</price>
     </book>
 </bookstore>"""
-
-
-class TestAIAssistantAgenticFeatures:
-    """Test AI Assistant agentic capabilities."""
     
     @pytest.fixture
     def panel(self, qtbot):
@@ -35,6 +34,11 @@ class TestAIAssistantAgenticFeatures:
         panel = AIAssistantPanel()
         qtbot.addWidget(panel)
         return panel
+    
+    @pytest.fixture
+    def xml_content(self):
+        """Provide test XML content as a fixture."""
+        return self.TEST_XML_CONTENT
     
     def test_panel_has_agentic_signals(self, panel):
         """Test that the panel has all required agentic signals."""
@@ -44,7 +48,7 @@ class TestAIAssistantAgenticFeatures:
         assert hasattr(panel, 'request_format_xml')
         assert hasattr(panel, 'request_validate_xml')
     
-    def test_execute_xpath_query(self, panel):
+    def test_execute_xpath_query(self, panel, xml_content):
         """Test XPath query execution."""
         panel.set_xml_content(xml_content)
         
@@ -67,13 +71,13 @@ class TestAIAssistantAgenticFeatures:
         result = panel.execute_xpath_query("//book")
         assert "No XML content" in result
     
-    def test_execute_xpath_query_invalid_expression(self, panel):
+    def test_execute_xpath_query_invalid_expression(self, panel, xml_content):
         """Test XPath query with invalid expression."""
         panel.set_xml_content(xml_content)
         result = panel.execute_xpath_query("///invalid[[[")
         assert "Error" in result
     
-    def test_execute_validate_xml_valid(self, panel):
+    def test_execute_validate_xml_valid(self, panel, xml_content):
         """Test XML validation with valid XML."""
         panel.set_xml_content(xml_content)
         result = panel.execute_validate_xml()
@@ -92,7 +96,7 @@ class TestAIAssistantAgenticFeatures:
         result = panel.execute_validate_xml()
         assert "No XML content" in result
     
-    def test_process_tool_commands_apply_xml(self, panel, qtbot):
+    def test_process_tool_commands_apply_xml(self, panel, qtbot, xml_content):
         """Test processing [[APPLY_XML]] command."""
         panel.set_xml_content(xml_content)
         
@@ -111,7 +115,7 @@ Done!"""
         assert blocker.signal_triggered
         assert "Applied XML to editor" in processed
     
-    def test_process_tool_commands_xpath(self, panel):
+    def test_process_tool_commands_xpath(self, panel, xml_content):
         """Test processing [[XPATH:]] command."""
         panel.set_xml_content(xml_content)
         
@@ -129,7 +133,7 @@ Done!"""
         
         assert "Formatted XML" in processed
     
-    def test_process_tool_commands_validate_xml(self, panel, qtbot):
+    def test_process_tool_commands_validate_xml(self, panel, qtbot, xml_content):
         """Test processing [[VALIDATE_XML]] command."""
         panel.set_xml_content(xml_content)
         

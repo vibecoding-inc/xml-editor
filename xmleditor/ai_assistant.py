@@ -283,6 +283,7 @@ class AIAssistantPanel(QWidget):
     # Constants for AI context limits
     MAX_XML_CONTEXT_LENGTH = 4000
     MAX_CONVERSATION_HISTORY = 6
+    MAX_XPATH_RESULTS = 10  # Limit XPath results to avoid very long output
     
     # System prompt for the AI
     SYSTEM_PROMPT = """You are an expert XML assistant integrated into an XML editor application. 
@@ -571,7 +572,8 @@ The user is currently working with an XML document in the editor."""
         tool_results = []
         
         # Process [[APPLY_XML]] command - look for it followed by an XML code block
-        apply_xml_pattern = r'\[\[APPLY_XML\]\]\s*```(?:xml)?\s*([\s\S]*?)```'
+        # Case-insensitive matching for language identifier (xml, XML, etc.)
+        apply_xml_pattern = r'\[\[APPLY_XML\]\]\s*```(?:[xX][mM][lL])?\s*([\s\S]*?)```'
         apply_matches = re.findall(apply_xml_pattern, response)
         for xml_content in apply_matches:
             xml_content = xml_content.strip()
@@ -620,9 +622,9 @@ The user is currently working with an XML document in the editor."""
             results = XMLUtilities.xpath_query(self.xml_content, xpath_expr)
             if results:
                 # Limit output to avoid very long results
-                if len(results) > 10:
-                    displayed = results[:10]
-                    displayed.append(f"... and {len(results) - 10} more results")
+                if len(results) > self.MAX_XPATH_RESULTS:
+                    displayed = results[:self.MAX_XPATH_RESULTS]
+                    displayed.append(f"... and {len(results) - self.MAX_XPATH_RESULTS} more results")
                     return "\n".join(displayed)
                 return "\n".join(results)
             else:
