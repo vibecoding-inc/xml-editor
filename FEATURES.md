@@ -182,6 +182,36 @@ count(//element)             - Count elements
 - **Block Comment**: Comment multiple lines
 - **Smart Uncomment**: Remove comment markers
 
+### AI Assistant
+
+#### Agentic AI Features
+- **AI-Powered Editing**: The AI assistant can directly edit your XML documents
+- **XPath Query Execution**: AI can run XPath queries to analyze document structure
+- **Automatic Formatting**: AI can format and pretty-print your XML
+- **Validation Integration**: AI can validate your XML and report issues
+- **File Opening**: AI can open files on your behalf
+
+#### AI Capabilities
+- **XML Structure Explanation**: Understand complex XML documents
+- **Error Detection & Fixing**: Find and fix XML syntax errors
+- **Content Generation**: Generate XML content from descriptions
+- **Optimization Suggestions**: Get recommendations for improving XML structure
+- **XPath/XSLT Help**: Get help with XPath queries and XSLT transformations
+
+#### AI Tool Commands
+The AI can use special commands to interact with the editor:
+- `[[APPLY_XML]]` - Apply XML content to the editor (followed by XML code block)
+- `[[XPATH: expression]]` - Execute XPath query and show results
+- `[[FORMAT_XML]]` - Format the current XML document
+- `[[VALIDATE_XML]]` - Validate the current XML document
+- `[[OPEN_FILE: path]]` - Open a file by path
+
+#### Configuration
+- **Multiple API Endpoints**: OpenRouter, OpenAI, local Ollama, or custom endpoints
+- **Model Selection**: Choose from various AI models (GPT-3.5, GPT-4, Claude, etc.)
+- **Secure Storage**: API keys stored with restrictive file permissions
+- **Enter Key Behavior**: Configurable Enter/Shift+Enter behavior
+
 ### User Interface
 
 #### Main Window
@@ -238,6 +268,7 @@ count(//element)             - Count elements
 #### View Operations
 - Ctrl+T - Toggle Tree View
 - Ctrl+O - Toggle Output Panel
+- Ctrl+Shift+A - Toggle AI Assistant
 - F5 - Refresh Tree
 
 ### Settings and Preferences

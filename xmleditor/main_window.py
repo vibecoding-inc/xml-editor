@@ -742,9 +742,33 @@ class MainWindow(QMainWindow):
         # Create AI Assistant panel
         self.ai_assistant = AIAssistantPanel()
         
+        # Connect agentic feature signals
+        self.ai_assistant.request_apply_xml.connect(self.ai_apply_xml)
+        self.ai_assistant.request_open_file.connect(self.ai_open_file)
+        self.ai_assistant.request_format_xml.connect(self.format_xml)
+        self.ai_assistant.request_validate_xml.connect(self.validate_xml)
+        
         self.ai_dock.setWidget(self.ai_assistant)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_dock)
         self.ai_dock.hide()
+    
+    def ai_apply_xml(self, xml_content):
+        """Apply XML content from AI assistant to the current editor."""
+        editor = self.get_current_editor()
+        if editor:
+            editor.set_text(xml_content)
+            self.refresh_tree_view()
+            self.statusBar().showMessage("AI applied XML to editor", 3000)
+            # Update AI assistant context with new content
+            self.update_ai_assistant_context()
+    
+    def ai_open_file(self, file_path):
+        """Open a file from AI assistant request."""
+        if os.path.exists(file_path):
+            self.load_file(file_path)
+            self.statusBar().showMessage(f"AI opened file: {file_path}", 3000)
+        else:
+            self.statusBar().showMessage(f"File not found: {file_path}", 3000)
     
     def _create_separator(self):
         """Create a vertical separator line."""
@@ -1544,13 +1568,25 @@ class MainWindow(QMainWindow):
             self.update_ai_assistant_context()
     
     def update_ai_assistant_context(self):
-        """Update AI Assistant with current editor content."""
+        """Update AI Assistant with current editor content and open files info."""
         editor = self.get_current_editor()
         if editor:
             content = editor.get_text().strip()
             self.ai_assistant.set_xml_content(content)
         else:
             self.ai_assistant.set_xml_content("")
+        
+        # Provide open files context
+        files_info = []
+        current_index = self.tab_widget.currentIndex()
+        for index in range(self.tab_widget.count()):
+            tab_data = self.tab_data.get(index, {})
+            file_path = tab_data.get('file_path') or 'Untitled'
+            files_info.append({
+                'path': file_path,
+                'is_current': index == current_index
+            })
+        self.ai_assistant.set_open_files_context(files_info)
     
     def refresh_graph_view(self):
         """Refresh the XML graph view."""

@@ -17,6 +17,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot, QEvent
 from PyQt6.QtGui import QFont, QKeyEvent
 
 from xmleditor.ai_settings_dialog import AISettingsManager, AISettingsDialog
+from xmleditor.xml_utils import XMLUtilities
 
 
 class ChatInputTextEdit(QTextEdit):
@@ -273,6 +274,12 @@ class AIAssistantPanel(QWidget):
     # Signal emitted when AI suggests XML content to apply
     apply_suggestion = pyqtSignal(str)
     
+    # Signals for agentic features
+    request_apply_xml = pyqtSignal(str)  # Apply/replace XML content in the editor
+    request_open_file = pyqtSignal(str)  # Open a file by path
+    request_format_xml = pyqtSignal()    # Format the current XML
+    request_validate_xml = pyqtSignal()  # Validate the current XML
+    
     # Constants for AI context limits
     MAX_XML_CONTEXT_LENGTH = 4000
     MAX_CONVERSATION_HISTORY = 6
@@ -286,12 +293,53 @@ Your role is to help users with XML-related tasks including:
 - Generating XML content based on descriptions
 - Answering questions about XML, XSD, DTD, XPath, and XSLT
 
+## Agentic Capabilities
+
+You have access to special tools that let you interact with the editor. When the user asks you to perform an action, you can use these tools by including special commands in your response:
+
+### Available Tools:
+1. **Apply XML** - Replace the current document with new XML content
+   - Use when the user asks you to fix, modify, or generate XML
+   - Command: `[[APPLY_XML]]` followed by an XML code block
+   
+2. **Execute XPath** - Query the current XML document
+   - Use to search or analyze the document structure
+   - Command: `[[XPATH: expression]]` - results will be shown
+   
+3. **Format XML** - Format/pretty-print the current document
+   - Command: `[[FORMAT_XML]]`
+   
+4. **Validate XML** - Check if the current XML is well-formed
+   - Command: `[[VALIDATE_XML]]`
+
+5. **Open File** - Open an XML file by path
+   - Command: `[[OPEN_FILE: /path/to/file.xml]]`
+
+### Example Tool Usage:
+To fix an error and apply the corrected XML:
+```
+I found the issue. The closing tag was wrong. Here's the fixed version:
+
+[[APPLY_XML]]
+```xml
+<root>
+    <corrected>content</corrected>
+</root>
+```
+
+To query the document:
+```
+Let me find all book elements:
+[[XPATH: //book]]
+```
+
 When providing XML examples, format them clearly. Be concise but helpful.
 The user is currently working with an XML document in the editor."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.xml_content = ""
+        self.open_files_info = []  # List of open files for context
         self.settings_manager = AISettingsManager()
         self.worker_thread = None
         self.conversation_history = []
@@ -405,6 +453,11 @@ The user is currently working with an XML document in the editor."""
                 "• Fix validation errors\n"
                 "• Generate XML content\n"
                 "• Optimize your documents\n\n"
+                "**🚀 Agentic Features:**\n"
+                "• I can directly edit your XML document\n"
+                "• I can execute XPath queries\n"
+                "• I can format and validate your XML\n"
+                "• I can open files for you\n\n"
                 "Load an XML document and ask me anything!"
             )
         else:
@@ -447,6 +500,16 @@ The user is currently working with an XML document in the editor."""
         messages = [
             {"role": "system", "content": self.SYSTEM_PROMPT}
         ]
+        
+        # Add open files context if available
+        if self.open_files_info:
+            files_list = []
+            for file_info in self.open_files_info:
+                marker = " (current)" if file_info.get('is_current') else ""
+                path = file_info.get('path', 'Untitled')
+                files_list.append(f"  • {path}{marker}")
+            files_context = "Open files in editor:\n" + "\n".join(files_list)
+            messages.append({"role": "system", "content": files_context})
         
         # Add XML context if available
         if self.xml_content.strip():
@@ -495,7 +558,91 @@ The user is currently working with an XML document in the editor."""
         # Store in conversation history
         self.conversation_history.append({"role": "assistant", "content": response})
         
-        self.add_ai_message(response)
+        # Process any tool commands in the response
+        processed_response = self.process_tool_commands(response)
+        
+        self.add_ai_message(processed_response)
+    
+    def process_tool_commands(self, response):
+        """
+        Process tool commands in AI response and execute them.
+        Returns the response with tool results appended.
+        """
+        tool_results = []
+        
+        # Process [[APPLY_XML]] command - look for it followed by an XML code block
+        apply_xml_pattern = r'\[\[APPLY_XML\]\]\s*```(?:xml)?\s*([\s\S]*?)```'
+        apply_matches = re.findall(apply_xml_pattern, response)
+        for xml_content in apply_matches:
+            xml_content = xml_content.strip()
+            if xml_content:
+                self.request_apply_xml.emit(xml_content)
+                tool_results.append("✅ Applied XML to editor")
+        
+        # Process [[XPATH: expression]] command
+        xpath_pattern = r'\[\[XPATH:\s*(.+?)\]\]'
+        xpath_matches = re.findall(xpath_pattern, response)
+        for xpath_expr in xpath_matches:
+            result = self.execute_xpath_query(xpath_expr.strip())
+            tool_results.append(f"📊 XPath `{xpath_expr}` result:\n{result}")
+        
+        # Process [[FORMAT_XML]] command
+        if '[[FORMAT_XML]]' in response:
+            self.request_format_xml.emit()
+            tool_results.append("✅ Formatted XML document")
+        
+        # Process [[VALIDATE_XML]] command
+        if '[[VALIDATE_XML]]' in response:
+            result = self.execute_validate_xml()
+            self.request_validate_xml.emit()
+            tool_results.append(f"🔍 Validation: {result}")
+        
+        # Process [[OPEN_FILE: path]] command
+        open_file_pattern = r'\[\[OPEN_FILE:\s*(.+?)\]\]'
+        open_file_matches = re.findall(open_file_pattern, response)
+        for file_path in open_file_matches:
+            file_path = file_path.strip()
+            self.request_open_file.emit(file_path)
+            tool_results.append(f"📂 Opened file: {file_path}")
+        
+        # Append tool results to response if any
+        if tool_results:
+            response += "\n\n---\n**Tool Actions:**\n" + "\n".join(tool_results)
+        
+        return response
+    
+    def execute_xpath_query(self, xpath_expr):
+        """Execute XPath query on current XML content and return results."""
+        if not self.xml_content.strip():
+            return "No XML content available"
+        
+        try:
+            results = XMLUtilities.xpath_query(self.xml_content, xpath_expr)
+            if results:
+                # Limit output to avoid very long results
+                if len(results) > 10:
+                    displayed = results[:10]
+                    displayed.append(f"... and {len(results) - 10} more results")
+                    return "\n".join(displayed)
+                return "\n".join(results)
+            else:
+                return "No results found"
+        except Exception as e:
+            return f"Error: {str(e)}"
+    
+    def execute_validate_xml(self):
+        """Validate current XML content and return result."""
+        if not self.xml_content.strip():
+            return "No XML content available"
+        
+        try:
+            is_valid, message = XMLUtilities.validate_xml(self.xml_content)
+            if is_valid:
+                return f"✅ {message}"
+            else:
+                return f"❌ {message}"
+        except Exception as e:
+            return f"Error: {str(e)}"
     
     @pyqtSlot(str)
     def on_ai_error(self, error_message):
@@ -531,6 +678,15 @@ The user is currently working with an XML document in the editor."""
             self.status_label.setText(f"Context: {lines} lines, {chars} characters")
         else:
             self.status_label.setText("No XML content loaded")
+    
+    def set_open_files_context(self, files_info):
+        """
+        Set information about currently open files for AI context.
+        
+        Args:
+            files_info: List of dicts with 'path' and 'is_current' keys
+        """
+        self.open_files_info = files_info
     
     def quick_action(self, action_type):
         """Handle quick action button clicks."""
