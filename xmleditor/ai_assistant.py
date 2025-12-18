@@ -91,6 +91,10 @@ class AIAssistantPanel(QWidget):
     # Signal emitted when AI suggests XML content to apply
     apply_suggestion = pyqtSignal(str)
     
+    # Constants for AI context limits
+    MAX_XML_CONTEXT_LENGTH = 4000
+    MAX_CONVERSATION_HISTORY = 6
+    
     # System prompt for the AI
     SYSTEM_PROMPT = """You are an expert XML assistant integrated into an XML editor application. 
 Your role is to help users with XML-related tasks including:
@@ -230,7 +234,7 @@ The user is currently working with an XML document in the editor."""
         dialog = AISettingsDialog(self)
         if dialog.exec():
             # Settings were saved, reload them
-            self.settings_manager._settings = None  # Force reload
+            self.settings_manager.reload_settings()
             self.add_ai_message("✅ Settings saved! AI assistant is now configured.")
     
     def call_ai_api(self, user_message, context_info=""):
@@ -250,9 +254,10 @@ The user is currently working with an XML document in the editor."""
         # Add XML context if available
         if self.xml_content.strip():
             # Truncate very long XML to avoid token limits
-            xml_preview = self.xml_content[:4000] if len(self.xml_content) > 4000 else self.xml_content
+            max_len = self.MAX_XML_CONTEXT_LENGTH
+            xml_preview = self.xml_content[:max_len] if len(self.xml_content) > max_len else self.xml_content
             context_msg = f"Current XML document:\n```xml\n{xml_preview}\n```"
-            if len(self.xml_content) > 4000:
+            if len(self.xml_content) > max_len:
                 context_msg += f"\n(Truncated, full document is {len(self.xml_content)} characters)"
             messages.append({"role": "system", "content": context_msg})
         
@@ -260,8 +265,8 @@ The user is currently working with an XML document in the editor."""
         if context_info:
             messages.append({"role": "system", "content": context_info})
         
-        # Add conversation history (last 6 messages to keep context manageable)
-        messages.extend(self.conversation_history[-6:])
+        # Add conversation history (limited to keep context manageable)
+        messages.extend(self.conversation_history[-self.MAX_CONVERSATION_HISTORY:])
         
         # Add the current user message
         messages.append({"role": "user", "content": user_message})

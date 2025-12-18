@@ -4,10 +4,12 @@ AI Settings Dialog for configuring the AI API endpoint and credentials.
 
 import os
 import json
+import urllib.request
+import urllib.error
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
-    QPushButton, QLabel, QGroupBox, QMessageBox, QComboBox
+    QPushButton, QLabel, QGroupBox, QMessageBox, QComboBox, QApplication
 )
 from PyQt6.QtCore import Qt
 
@@ -80,6 +82,11 @@ class AISettingsManager:
     def is_configured(self):
         """Check if API key is configured."""
         return bool(self.get_api_key().strip())
+    
+    def reload_settings(self):
+        """Force reload settings from disk."""
+        self._settings = None
+        return self.load_settings()
 
 
 class AISettingsDialog(QDialog):
@@ -241,9 +248,6 @@ class AISettingsDialog(QDialog):
     
     def test_connection(self):
         """Test the API connection."""
-        import urllib.request
-        import urllib.error
-        
         api_url = self.api_url_input.text().strip()
         api_key = self.api_key_input.text().strip()
         model = self.model_input.currentText().strip()
@@ -258,7 +262,6 @@ class AISettingsDialog(QDialog):
         self.test_btn.setEnabled(False)
         
         # Force UI update
-        from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
         
         try:
