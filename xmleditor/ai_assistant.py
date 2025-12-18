@@ -5,13 +5,84 @@ Provides an AI-powered assistant to help with XML editing tasks.
 
 import html
 import re
+import json
+import urllib.request
+import urllib.error
 from lxml import etree
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton,
-    QLabel, QComboBox, QScrollArea, QFrame
+    QLabel, QComboBox, QScrollArea, QFrame, QApplication
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtGui import QFont
+
+from xmleditor.ai_settings_dialog import AISettingsManager, AISettingsDialog
+
+
+class AIWorkerThread(QThread):
+    """Worker thread for making AI API calls without blocking the UI."""
+    
+    response_ready = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, api_url, api_key, model, messages):
+        super().__init__()
+        self.api_url = api_url
+        self.api_key = api_key
+        self.model = model
+        self.messages = messages
+    
+    def run(self):
+        """Execute the API call."""
+        try:
+            data = json.dumps({
+                "model": self.model,
+                "messages": self.messages,
+                "max_tokens": 2000,
+                "temperature": 0.7
+            }).encode('utf-8')
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+                "HTTP-Referer": "https://github.com/xml-editor",
+                "X-Title": "XML Editor AI Assistant"
+            }
+            
+            req = urllib.request.Request(self.api_url, data=data, headers=headers, method='POST')
+            
+            with urllib.request.urlopen(req, timeout=60) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                
+                if 'choices' in result and len(result['choices']) > 0:
+                    message = result['choices'][0].get('message', {})
+                    content = message.get('content', 'No response content')
+                    self.response_ready.emit(content)
+                else:
+                    self.error_occurred.emit("Unexpected API response format")
+        
+        except urllib.error.HTTPError as e:
+            error_body = ""
+            try:
+                error_body = e.read().decode('utf-8')
+            except Exception:
+                pass
+            
+            if e.code == 401:
+                self.error_occurred.emit("Invalid API key. Please check your settings.")
+            elif e.code == 429:
+                self.error_occurred.emit("Rate limit exceeded. Please wait and try again.")
+            else:
+                self.error_occurred.emit(f"API Error ({e.code}): {error_body[:100]}")
+        
+        except urllib.error.URLError as e:
+            self.error_occurred.emit(f"Connection error: {str(e.reason)}")
+        
+        except json.JSONDecodeError:
+            self.error_occurred.emit("Failed to parse API response")
+        
+        except Exception as e:
+            self.error_occurred.emit(f"Error: {str(e)}")
 
 
 class AIAssistantPanel(QWidget):
@@ -20,9 +91,24 @@ class AIAssistantPanel(QWidget):
     # Signal emitted when AI suggests XML content to apply
     apply_suggestion = pyqtSignal(str)
     
+    # System prompt for the AI
+    SYSTEM_PROMPT = """You are an expert XML assistant integrated into an XML editor application. 
+Your role is to help users with XML-related tasks including:
+- Explaining XML structure and elements
+- Finding and fixing XML errors
+- Suggesting optimizations and best practices
+- Generating XML content based on descriptions
+- Answering questions about XML, XSD, DTD, XPath, and XSLT
+
+When providing XML examples, format them clearly. Be concise but helpful.
+The user is currently working with an XML document in the editor."""
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.xml_content = ""
+        self.settings_manager = AISettingsManager()
+        self.worker_thread = None
+        self.conversation_history = []
         self.init_ui()
     
     def init_ui(self):
@@ -31,12 +117,20 @@ class AIAssistantPanel(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(5)
         
-        # Header with title
+        # Header with title and settings button
         header_layout = QHBoxLayout()
         title_label = QLabel("🤖 AI Assistant")
         title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
+        
+        # Settings button
+        self.settings_btn = QPushButton("⚙️")
+        self.settings_btn.setToolTip("Configure AI settings")
+        self.settings_btn.setMaximumWidth(30)
+        self.settings_btn.clicked.connect(self.show_settings_dialog)
+        header_layout.addWidget(self.settings_btn)
+        
         layout.addLayout(header_layout)
         
         # Quick action buttons
@@ -106,15 +200,125 @@ class AIAssistantPanel(QWidget):
         layout.addWidget(self.status_label)
         
         # Initialize chat with welcome message
-        self.add_ai_message(
-            "👋 Hello! I'm your AI assistant for XML editing.\n\n"
-            "I can help you:\n"
-            "• Understand XML structure\n"
-            "• Fix validation errors\n"
-            "• Generate XML content\n"
-            "• Optimize your documents\n\n"
-            "Load an XML document and ask me anything!"
+        self.show_welcome_message()
+    
+    def show_welcome_message(self):
+        """Show the welcome message based on configuration status."""
+        if self.settings_manager.is_configured():
+            self.add_ai_message(
+                "👋 Hello! I'm your AI assistant for XML editing.\n\n"
+                "I can help you:\n"
+                "• Understand XML structure\n"
+                "• Fix validation errors\n"
+                "• Generate XML content\n"
+                "• Optimize your documents\n\n"
+                "Load an XML document and ask me anything!"
+            )
+        else:
+            self.add_ai_message(
+                "👋 Hello! I'm your AI assistant for XML editing.\n\n"
+                "⚠️ API not configured yet!\n\n"
+                "Click the ⚙️ button above to configure:\n"
+                "• API endpoint (OpenRouter, OpenAI, etc.)\n"
+                "• Your API key\n"
+                "• Model selection\n\n"
+                "Once configured, I can provide AI-powered assistance!"
+            )
+    
+    def show_settings_dialog(self):
+        """Open the AI settings dialog."""
+        dialog = AISettingsDialog(self)
+        if dialog.exec():
+            # Settings were saved, reload them
+            self.settings_manager._settings = None  # Force reload
+            self.add_ai_message("✅ Settings saved! AI assistant is now configured.")
+    
+    def call_ai_api(self, user_message, context_info=""):
+        """Make an API call to the AI service."""
+        if not self.settings_manager.is_configured():
+            self.add_ai_message(
+                "⚠️ API not configured!\n\n"
+                "Please click the ⚙️ button to configure your API settings."
+            )
+            return
+        
+        # Build the messages for the API
+        messages = [
+            {"role": "system", "content": self.SYSTEM_PROMPT}
+        ]
+        
+        # Add XML context if available
+        if self.xml_content.strip():
+            # Truncate very long XML to avoid token limits
+            xml_preview = self.xml_content[:4000] if len(self.xml_content) > 4000 else self.xml_content
+            context_msg = f"Current XML document:\n```xml\n{xml_preview}\n```"
+            if len(self.xml_content) > 4000:
+                context_msg += f"\n(Truncated, full document is {len(self.xml_content)} characters)"
+            messages.append({"role": "system", "content": context_msg})
+        
+        # Add context info if provided
+        if context_info:
+            messages.append({"role": "system", "content": context_info})
+        
+        # Add conversation history (last 6 messages to keep context manageable)
+        messages.extend(self.conversation_history[-6:])
+        
+        # Add the current user message
+        messages.append({"role": "user", "content": user_message})
+        
+        # Store in conversation history
+        self.conversation_history.append({"role": "user", "content": user_message})
+        
+        # Disable input while processing
+        self.set_input_enabled(False)
+        self.status_label.setText("⏳ Waiting for AI response...")
+        
+        # Start the worker thread
+        self.worker_thread = AIWorkerThread(
+            self.settings_manager.get_api_url(),
+            self.settings_manager.get_api_key(),
+            self.settings_manager.get_model(),
+            messages
         )
+        self.worker_thread.response_ready.connect(self.on_ai_response)
+        self.worker_thread.error_occurred.connect(self.on_ai_error)
+        self.worker_thread.start()
+    
+    @pyqtSlot(str)
+    def on_ai_response(self, response):
+        """Handle successful AI response."""
+        self.set_input_enabled(True)
+        self.update_status_label()
+        
+        # Store in conversation history
+        self.conversation_history.append({"role": "assistant", "content": response})
+        
+        self.add_ai_message(response)
+    
+    @pyqtSlot(str)
+    def on_ai_error(self, error_message):
+        """Handle AI API error."""
+        self.set_input_enabled(True)
+        self.update_status_label()
+        self.add_ai_message(f"❌ {error_message}")
+    
+    def set_input_enabled(self, enabled):
+        """Enable or disable input controls."""
+        self.user_input.setEnabled(enabled)
+        self.send_btn.setEnabled(enabled)
+        self.explain_btn.setEnabled(enabled)
+        self.fix_btn.setEnabled(enabled)
+        self.optimize_btn.setEnabled(enabled)
+        self.generate_btn.setEnabled(enabled)
+    
+    def update_status_label(self):
+        """Update status label with current context info."""
+        if self.xml_content.strip():
+            lines = self.xml_content.count('\n') + 1
+            chars = len(self.xml_content)
+            self.status_label.setText(f"Context: {lines} lines, {chars} characters")
+        else:
+            self.status_label.setText("No XML content loaded")
     
     def set_xml_content(self, content):
         """Set the current XML content for context."""
@@ -134,24 +338,58 @@ class AIAssistantPanel(QWidget):
             )
             return
         
-        if action_type == "explain":
-            self.add_user_message("Explain this XML structure")
-            self.explain_xml()
-        elif action_type == "fix":
-            self.add_user_message("Check for errors and suggest fixes")
-            self.fix_errors()
-        elif action_type == "optimize":
-            self.add_user_message("Suggest optimizations")
-            self.suggest_optimizations()
-        elif action_type == "generate":
-            self.add_user_message("Help me generate XML content")
-            self.add_ai_message(
-                "📝 I can help you generate XML content. Please describe what you need:\n\n"
-                "Examples:\n"
-                "• 'Create a person element with name and age'\n"
-                "• 'Add a list of products with id, name, and price'\n"
-                "• 'Generate an RSS feed structure'"
-            )
+        # Use AI API if configured, otherwise use local analysis
+        if self.settings_manager.is_configured():
+            if action_type == "explain":
+                self.add_user_message("Explain this XML structure")
+                self.call_ai_api(
+                    "Please analyze and explain the structure of this XML document. "
+                    "Include information about the root element, child elements, attributes, "
+                    "namespaces if any, and the overall purpose of the document."
+                )
+            elif action_type == "fix":
+                self.add_user_message("Check for errors and suggest fixes")
+                self.call_ai_api(
+                    "Please check this XML document for any errors, issues, or problems. "
+                    "If there are errors, explain what's wrong and suggest how to fix them. "
+                    "If the document is well-formed, confirm that and mention any potential improvements."
+                )
+            elif action_type == "optimize":
+                self.add_user_message("Suggest optimizations")
+                self.call_ai_api(
+                    "Please analyze this XML document and suggest optimizations or improvements. "
+                    "Consider structure, readability, efficiency, and best practices."
+                )
+            elif action_type == "generate":
+                self.add_user_message("Help me generate XML content")
+                self.add_ai_message(
+                    "📝 I can help you generate XML content. Please describe what you need:\n\n"
+                    "Examples:\n"
+                    "• 'Create a person element with name and age'\n"
+                    "• 'Add a list of products with id, name, and price'\n"
+                    "• 'Generate an RSS feed structure'"
+                )
+        else:
+            # Fallback to local analysis
+            if action_type == "explain":
+                self.add_user_message("Explain this XML structure")
+                self.explain_xml_local()
+            elif action_type == "fix":
+                self.add_user_message("Check for errors and suggest fixes")
+                self.fix_errors_local()
+            elif action_type == "optimize":
+                self.add_user_message("Suggest optimizations")
+                self.suggest_optimizations_local()
+            elif action_type == "generate":
+                self.add_user_message("Help me generate XML content")
+                self.add_ai_message(
+                    "📝 I can help you generate XML content. Please describe what you need:\n\n"
+                    "Examples:\n"
+                    "• 'Create a person element with name and age'\n"
+                    "• 'Add a list of products with id, name, and price'\n"
+                    "• 'Generate an RSS feed structure'\n\n"
+                    "💡 Configure API settings (⚙️) for AI-powered generation!"
+                )
     
     def send_message(self):
         """Send user message and get AI response."""
@@ -167,25 +405,29 @@ class AIAssistantPanel(QWidget):
     
     def process_user_message(self, message):
         """Process user message and generate AI response."""
-        message_lower = message.lower()
-        
-        # Check for different intents and respond accordingly
-        if any(word in message_lower for word in ['explain', 'what is', 'describe', 'tell me about']):
-            self.explain_xml()
-        elif any(word in message_lower for word in ['fix', 'error', 'wrong', 'problem', 'issue']):
-            self.fix_errors()
-        elif any(word in message_lower for word in ['optimize', 'improve', 'better', 'simplify']):
-            self.suggest_optimizations()
-        elif any(word in message_lower for word in ['generate', 'create', 'add', 'make', 'new']):
-            self.generate_content_help(message)
-        elif any(word in message_lower for word in ['validate', 'check', 'valid']):
-            self.check_validation()
-        elif any(word in message_lower for word in ['help', 'what can']):
-            self.show_help()
+        # Use AI API if configured
+        if self.settings_manager.is_configured():
+            self.call_ai_api(message)
         else:
-            self.general_response(message)
+            # Fallback to local processing
+            message_lower = message.lower()
+            
+            if any(word in message_lower for word in ['explain', 'what is', 'describe', 'tell me about']):
+                self.explain_xml_local()
+            elif any(word in message_lower for word in ['fix', 'error', 'wrong', 'problem', 'issue']):
+                self.fix_errors_local()
+            elif any(word in message_lower for word in ['optimize', 'improve', 'better', 'simplify']):
+                self.suggest_optimizations_local()
+            elif any(word in message_lower for word in ['generate', 'create', 'add', 'make', 'new']):
+                self.generate_content_help(message)
+            elif any(word in message_lower for word in ['validate', 'check', 'valid']):
+                self.check_validation()
+            elif any(word in message_lower for word in ['help', 'what can']):
+                self.show_help()
+            else:
+                self.general_response(message)
     
-    def explain_xml(self):
+    def explain_xml_local(self):
         """Explain the current XML structure."""
         if not self.xml_content.strip():
             self.add_ai_message("⚠️ No XML content to explain. Please load an XML document first.")
@@ -230,8 +472,8 @@ class AIAssistantPanel(QWidget):
         except Exception as e:
             self.add_ai_message(f"❌ Error analyzing XML: {str(e)}")
     
-    def fix_errors(self):
-        """Check for errors and suggest fixes."""
+    def fix_errors_local(self):
+        """Check for errors and suggest fixes (local analysis)."""
         if not self.xml_content.strip():
             self.add_ai_message("⚠️ No XML content to check. Please load an XML document first.")
             return
@@ -291,8 +533,8 @@ class AIAssistantPanel(QWidget):
         
         return suggestions
     
-    def suggest_optimizations(self):
-        """Suggest optimizations for the XML."""
+    def suggest_optimizations_local(self):
+        """Suggest optimizations for the XML (local analysis)."""
         if not self.xml_content.strip():
             self.add_ai_message("⚠️ No XML content to optimize. Please load an XML document first.")
             return
