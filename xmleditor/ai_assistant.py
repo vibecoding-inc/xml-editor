@@ -106,11 +106,31 @@ class MarkdownRenderer:
         # Match fenced code blocks with optional language
         text = re.sub(r'```(\w*)\n?(.*?)```', save_code_block, text, flags=re.DOTALL)
         
+        # Extract and protect inline code before HTML escaping
+        inline_codes = []
+        
+        def save_inline_code(match):
+            code = match.group(1)
+            index = len(inline_codes)
+            inline_codes.append(code)
+            return f'%%INLINECODE_{index}%%'
+        
+        text = re.sub(r'`([^`]+)`', save_inline_code, text)
+        
+        # Process blockquotes BEFORE HTML escaping (while > is still >)
+        text = re.sub(r'^> (.+)$', r'%%BLOCKQUOTE_START%%\1%%BLOCKQUOTE_END%%', text, flags=re.MULTILINE)
+        
         # Escape HTML in remaining text
         text = html.escape(text)
         
-        # Process inline code (backticks)
-        text = re.sub(r'`([^`]+)`', r'<span class="inline-code">\1</span>', text)
+        # Restore blockquotes
+        text = text.replace('%%BLOCKQUOTE_START%%', '<blockquote>')
+        text = text.replace('%%BLOCKQUOTE_END%%', '</blockquote>')
+        
+        # Restore inline code with proper escaping
+        for i, code in enumerate(inline_codes):
+            escaped_code = html.escape(code)
+            text = text.replace(f'%%INLINECODE_{i}%%', f'<span class="inline-code">{escaped_code}</span>')
         
         # Process headers
         text = re.sub(r'^#### (.+)$', r'<h4>\1</h4>', text, flags=re.MULTILINE)
@@ -125,17 +145,19 @@ class MarkdownRenderer:
         text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
         text = re.sub(r'_(.+?)_', r'<em>\1</em>', text)
         
-        # Process blockquotes
-        text = re.sub(r'^&gt; (.+)$', r'<blockquote>\1</blockquote>', text, flags=re.MULTILINE)
-        
         # Process unordered lists (• and - and *)
         text = re.sub(r'^[\s]*[•\-\*] (.+)$', r'<li>\1</li>', text, flags=re.MULTILINE)
         
         # Wrap consecutive <li> items in <ul>
         text = re.sub(r'((?:<li>.*?</li>\n?)+)', r'<ul>\1</ul>', text)
         
-        # Process numbered lists
-        text = re.sub(r'^[\s]*(\d+)\. (.+)$', r'<li>\2</li>', text, flags=re.MULTILINE)
+        # Process numbered lists - wrap in <ol>
+        # First mark numbered list items
+        text = re.sub(r'^[\s]*(\d+)\. (.+)$', r'<oli>\2</oli>', text, flags=re.MULTILINE)
+        # Wrap consecutive numbered items in <ol>
+        text = re.sub(r'((?:<oli>.*?</oli>\n?)+)', r'<ol>\1</ol>', text)
+        # Convert <oli> to <li>
+        text = text.replace('<oli>', '<li>').replace('</oli>', '</li>')
         
         # Convert newlines to <br> (but not inside block elements)
         text = text.replace('\n', '<br>\n')
