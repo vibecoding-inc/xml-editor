@@ -19,7 +19,7 @@ class AISettingsManager:
     """Manages AI settings storage in user's home directory."""
     
     DEFAULT_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-    DEFAULT_MODEL = "openai/gpt-3.5-turbo"
+    DEFAULT_MODEL = "openai/gpt-4o-mini"
     
     def __init__(self):
         self.config_dir = Path.home() / ".config" / "xml-editor"
@@ -103,14 +103,15 @@ class AISettingsDialog(QDialog):
     }
     
     COMMON_MODELS = [
-        "openai/gpt-3.5-turbo",
-        "openai/gpt-4",
+        "openai/gpt-4o",
+        "openai/gpt-4o-mini",
         "openai/gpt-4-turbo",
+        "anthropic/claude-3.5-sonnet",
         "anthropic/claude-3-haiku",
-        "anthropic/claude-3-sonnet",
+        "google/gemini-2.0-flash-exp",
         "google/gemini-pro",
-        "mistralai/mistral-7b-instruct",
-        "meta-llama/llama-2-70b-chat",
+        "mistralai/mistral-large",
+        "meta-llama/llama-3.1-70b-instruct",
     ]
     
     def __init__(self, parent=None):
@@ -156,7 +157,7 @@ class AISettingsDialog(QDialog):
         self.model_input = QComboBox()
         self.model_input.setEditable(True)
         self.model_input.addItems(self.COMMON_MODELS)
-        self.model_input.setCurrentText("openai/gpt-3.5-turbo")
+        self.model_input.setCurrentText("openai/gpt-4o-mini")
         api_layout.addRow("Model:", self.model_input)
         
         layout.addWidget(api_group)

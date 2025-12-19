@@ -23,6 +23,7 @@ buildPythonApplication rec {
     pyqt6-sip
     lxml
     pygments
+    openai
   ] ++ lib.optionals gui [
     pkgs.qt6.qtbase
     pkgs.qt6.qtwayland

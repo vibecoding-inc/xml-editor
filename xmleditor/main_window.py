@@ -742,9 +742,84 @@ class MainWindow(QMainWindow):
         # Create AI Assistant panel
         self.ai_assistant = AIAssistantPanel()
         
+        # Connect the AI assistant to editor operations for agentic features
+        self.ai_assistant.set_editor_callbacks(
+            get_content=self._ai_get_current_content,
+            set_content=self._ai_set_current_content,
+            get_open_files=self._ai_get_open_files,
+            open_file=self._ai_open_file,
+            switch_tab=self._ai_switch_tab
+        )
+        
         self.ai_dock.setWidget(self.ai_assistant)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_dock)
         self.ai_dock.hide()
+    
+    def _ai_get_current_content(self) -> str:
+        """Get the current editor content for AI assistant."""
+        editor = self.get_current_editor()
+        if editor:
+            return editor.get_text()
+        return ""
+    
+    def _ai_set_current_content(self, content: str) -> None:
+        """Set the current editor content from AI assistant."""
+        editor = self.get_current_editor()
+        if editor:
+            editor.set_text(content)
+            self.refresh_tree_view()
+            if self.graph_dock.isVisible():
+                self.refresh_graph_view()
+    
+    def _ai_get_open_files(self) -> list:
+        """Get list of open files for AI assistant."""
+        files = []
+        current_index = self.tab_widget.currentIndex()
+        for i in range(self.tab_widget.count()):
+            tab_data = self.tab_data.get(i, {})
+            file_path = tab_data.get('file_path')
+            is_modified = tab_data.get('is_modified', False)
+            
+            files.append({
+                'index': i,
+                'name': os.path.basename(file_path) if file_path else 'Untitled',
+                'path': file_path,
+                'is_modified': is_modified,
+                'is_current': i == current_index
+            })
+        return files
+    
+    def _ai_open_file(self, file_path: str) -> None:
+        """Open a file from AI assistant request."""
+        if os.path.exists(file_path):
+            self.load_file(file_path)
+        else:
+            raise FileNotFoundError(f"File not found: {file_path}")
+    
+    def _ai_switch_tab(self, tab_identifier: str) -> None:
+        """Switch to a tab from AI assistant request."""
+        # Try to parse as index first
+        try:
+            index = int(tab_identifier)
+            if 0 <= index < self.tab_widget.count():
+                self.tab_widget.setCurrentIndex(index)
+                return
+        except ValueError:
+            pass
+        
+        # Try to find by filename
+        for i in range(self.tab_widget.count()):
+            tab_data = self.tab_data.get(i, {})
+            file_path = tab_data.get('file_path')
+            if file_path:
+                if os.path.basename(file_path) == tab_identifier or file_path == tab_identifier:
+                    self.tab_widget.setCurrentIndex(i)
+                    return
+            elif self.tab_widget.tabText(i) == tab_identifier:
+                self.tab_widget.setCurrentIndex(i)
+                return
+        
+        raise ValueError(f"Tab not found: {tab_identifier}")
     
     def _create_separator(self):
         """Create a vertical separator line."""

@@ -5,19 +5,17 @@ Provides an AI-powered assistant to help with XML editing tasks.
 
 import html
 import re
-import json
-import urllib.request
-import urllib.error
 from collections import OrderedDict
 from lxml import etree
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton,
     QLabel, QComboBox, QScrollArea, QFrame, QApplication, QTextBrowser
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot, QEvent
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QEvent
 from PyQt6.QtGui import QFont, QKeyEvent
 
 from xmleditor.ai_settings_dialog import AISettingsManager, AISettingsDialog
+from xmleditor.ai_agent_tools import AgentToolExecutor, AIAgentWorkerThread
 
 # Try to import mermaid-py for diagram rendering
 try:
@@ -371,93 +369,48 @@ class MarkdownRenderer:
         return cls.STYLES
 
 
-class AIWorkerThread(QThread):
-    """Worker thread for making AI API calls without blocking the UI."""
-    
-    response_ready = pyqtSignal(str)
-    error_occurred = pyqtSignal(str)
-    
-    def __init__(self, api_url, api_key, model, messages):
-        super().__init__()
-        self.api_url = api_url
-        self.api_key = api_key
-        self.model = model
-        self.messages = messages
-    
-    def run(self):
-        """Execute the API call."""
-        try:
-            data = json.dumps({
-                "model": self.model,
-                "messages": self.messages,
-                "max_tokens": 2000,
-                "temperature": 0.7
-            }).encode('utf-8')
-            
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-                "HTTP-Referer": "https://github.com/xml-editor",
-                "X-Title": "XML Editor AI Assistant"
-            }
-            
-            req = urllib.request.Request(self.api_url, data=data, headers=headers, method='POST')
-            
-            with urllib.request.urlopen(req, timeout=60) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                
-                if 'choices' in result and len(result['choices']) > 0:
-                    message = result['choices'][0].get('message', {})
-                    content = message.get('content', 'No response content')
-                    self.response_ready.emit(content)
-                else:
-                    self.error_occurred.emit("Unexpected API response format")
-        
-        except urllib.error.HTTPError as e:
-            error_body = ""
-            try:
-                error_body = e.read().decode('utf-8')
-            except Exception:
-                pass
-            
-            if e.code == 401:
-                self.error_occurred.emit("Invalid API key. Please check your settings.")
-            elif e.code == 429:
-                self.error_occurred.emit("Rate limit exceeded. Please wait and try again.")
-            else:
-                self.error_occurred.emit(f"API Error ({e.code}): {error_body[:100]}")
-        
-        except urllib.error.URLError as e:
-            self.error_occurred.emit(f"Connection error: {str(e.reason)}")
-        
-        except json.JSONDecodeError:
-            self.error_occurred.emit("Failed to parse API response")
-        
-        except Exception as e:
-            self.error_occurred.emit(f"Error: {str(e)}")
-
-
 class AIAssistantPanel(QWidget):
     """AI Assistant panel for XML-related help and suggestions."""
     
     # Signal emitted when AI suggests XML content to apply
     apply_suggestion = pyqtSignal(str)
     
+    # Signals for agentic file operations (connected by MainWindow)
+    request_open_file = pyqtSignal(str)  # Request to open a file by path
+    request_switch_tab = pyqtSignal(str)  # Request to switch to a tab
+    
     # Constants for AI context limits
     MAX_XML_CONTEXT_LENGTH = 4000
     MAX_CONVERSATION_HISTORY = 6
     
-    # System prompt for the AI
+    # System prompt for the AI with agentic capabilities
     SYSTEM_PROMPT = """You are an expert XML assistant integrated into an XML editor application. 
-Your role is to help users with XML-related tasks including:
-- Explaining XML structure and elements
-- Finding and fixing XML errors
-- Suggesting optimizations and best practices
-- Generating XML content based on descriptions
-- Answering questions about XML, XSD, DTD, XPath, and XSLT
+You have special tools that allow you to interact with the editor directly:
 
-When providing XML examples, format them clearly. Be concise but helpful.
-The user is currently working with an XML document in the editor."""
+**Available Tools:**
+- `get_current_file_content`: Get the content of the currently open XML file
+- `edit_current_file`: Replace the content of the current file with new XML content
+- `open_file`: Open a file by its path in a new tab
+- `execute_xpath`: Execute XPath queries on the current document
+- `validate_xml`: Validate XML for well-formedness or against a schema
+- `format_xml`: Format/prettify the current XML document
+- `get_open_files`: List all currently open files/tabs
+- `switch_to_tab`: Switch to a specific tab by index or filename
+
+**Guidelines:**
+- When the user asks you to edit the file, use the `edit_current_file` tool to make changes directly
+- Use `execute_xpath` to analyze the document structure before making complex edits
+- Always validate changes after editing to ensure the XML is still well-formed
+- When explaining errors, use the actual document content from `get_current_file_content`
+- Be proactive in using tools to help the user accomplish their task
+
+You can chain multiple tool calls together to complete complex tasks. For example:
+1. Get the current content
+2. Analyze it with XPath
+3. Make edits
+4. Validate the result
+
+Be concise but helpful. Format XML examples clearly when showing them to the user."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -465,6 +418,18 @@ The user is currently working with an XML document in the editor."""
         self.settings_manager = AISettingsManager()
         self.worker_thread = None
         self.conversation_history = []
+        
+        # Initialize the tool executor
+        self.tool_executor = AgentToolExecutor()
+        self._register_local_tools()
+        
+        # Callbacks that will be set by MainWindow
+        self._get_current_content_callback = None
+        self._set_current_content_callback = None
+        self._get_open_files_callback = None
+        self._open_file_callback = None
+        self._switch_tab_callback = None
+        
         self.init_ui()
     
     def init_ui(self):
@@ -604,8 +569,175 @@ The user is currently working with an XML document in the editor."""
                 self.user_input.setPlaceholderText("Ask AI about your XML... (Shift+Enter to send, Enter for newline)")
             self.add_ai_message("✅ Settings saved! AI assistant is now configured.")
     
+    def _register_local_tools(self):
+        """Register local tool implementations with the tool executor."""
+        self.tool_executor.register_callback("get_current_file_content", self._tool_get_current_content)
+        self.tool_executor.register_callback("edit_current_file", self._tool_edit_current_file)
+        self.tool_executor.register_callback("open_file", self._tool_open_file)
+        self.tool_executor.register_callback("execute_xpath", self._tool_execute_xpath)
+        self.tool_executor.register_callback("validate_xml", self._tool_validate_xml)
+        self.tool_executor.register_callback("format_xml", self._tool_format_xml)
+        self.tool_executor.register_callback("get_open_files", self._tool_get_open_files)
+        self.tool_executor.register_callback("switch_to_tab", self._tool_switch_to_tab)
+    
+    def set_editor_callbacks(self, get_content, set_content, get_open_files, open_file, switch_tab):
+        """
+        Set callbacks for editor operations.
+        These are called by the tool executor when the AI uses tools.
+        
+        Args:
+            get_content: Callable that returns current editor content
+            set_content: Callable that sets current editor content
+            get_open_files: Callable that returns list of open files
+            open_file: Callable that opens a file by path
+            switch_tab: Callable that switches to a tab
+        """
+        self._get_current_content_callback = get_content
+        self._set_current_content_callback = set_content
+        self._get_open_files_callback = get_open_files
+        self._open_file_callback = open_file
+        self._switch_tab_callback = switch_tab
+    
+    def _tool_get_current_content(self) -> str:
+        """Tool: Get the current file content."""
+        if self._get_current_content_callback:
+            content = self._get_current_content_callback()
+            if content:
+                return content
+            return "No file is currently open."
+        # Fallback to cached content
+        return self.xml_content if self.xml_content else "No file is currently open."
+    
+    def _tool_edit_current_file(self, new_content: str) -> str:
+        """Tool: Edit the current file with new content."""
+        if not self._set_current_content_callback:
+            return "Error: Editor connection not available."
+        
+        try:
+            self._set_current_content_callback(new_content)
+            # Update our cached content
+            self.xml_content = new_content
+            return "File content updated successfully."
+        except Exception as e:
+            return f"Error updating file: {str(e)}"
+    
+    def _tool_open_file(self, file_path: str) -> str:
+        """Tool: Open a file by path."""
+        if not self._open_file_callback:
+            return "Error: Editor connection not available."
+        
+        try:
+            self._open_file_callback(file_path)
+            return f"Opened file: {file_path}"
+        except Exception as e:
+            return f"Error opening file: {str(e)}"
+    
+    def _tool_execute_xpath(self, xpath_expression: str, context_xpath: str = "") -> str:
+        """Tool: Execute an XPath query."""
+        from xmleditor.xml_utils import XMLUtilities
+        
+        content = self._tool_get_current_content()
+        if content.startswith("No file") or content.startswith("Error"):
+            return content
+        
+        try:
+            results = XMLUtilities.xpath_query(content, xpath_expression, context_xpath)
+            if not results:
+                return "XPath query returned no results."
+            
+            # Format results
+            if len(results) == 1:
+                return f"Result:\n{results[0]}"
+            else:
+                formatted = f"Found {len(results)} results:\n"
+                for i, result in enumerate(results[:20], 1):  # Limit to 20 results
+                    formatted += f"\n{i}. {result}"
+                if len(results) > 20:
+                    formatted += f"\n... and {len(results) - 20} more results"
+                return formatted
+        except Exception as e:
+            return f"XPath error: {str(e)}"
+    
+    def _tool_validate_xml(self, schema_content: str = "") -> str:
+        """Tool: Validate XML content."""
+        from xmleditor.xml_utils import XMLUtilities
+        
+        content = self._tool_get_current_content()
+        if content.startswith("No file") or content.startswith("Error"):
+            return content
+        
+        try:
+            if schema_content:
+                is_valid, message = XMLUtilities.validate_with_xsd(content, schema_content)
+            else:
+                is_valid, message = XMLUtilities.validate_xml(content)
+            
+            return message
+        except Exception as e:
+            return f"Validation error: {str(e)}"
+    
+    def _tool_format_xml(self) -> str:
+        """Tool: Format the current XML document."""
+        from xmleditor.xml_utils import XMLUtilities
+        
+        content = self._tool_get_current_content()
+        if content.startswith("No file") or content.startswith("Error"):
+            return content
+        
+        try:
+            formatted = XMLUtilities.format_xml(content)
+            # Apply the formatted content
+            result = self._tool_edit_current_file(formatted)
+            if "successfully" in result:
+                return "XML formatted successfully."
+            return result
+        except Exception as e:
+            return f"Format error: {str(e)}"
+    
+    def _tool_get_open_files(self) -> str:
+        """Tool: Get list of open files."""
+        if not self._get_open_files_callback:
+            return "Error: Editor connection not available."
+        
+        try:
+            files = self._get_open_files_callback()
+            if not files:
+                return "No files are currently open."
+            
+            result = "Open files:\n"
+            for i, file_info in enumerate(files):
+                modified = " *" if file_info.get("is_modified", False) else ""
+                current = " (current)" if file_info.get("is_current", False) else ""
+                result += f"{i}. {file_info.get('name', 'Untitled')}{modified}{current}\n"
+            return result
+        except Exception as e:
+            return f"Error getting open files: {str(e)}"
+    
+    def _tool_switch_to_tab(self, tab_identifier: str) -> str:
+        """Tool: Switch to a specific tab."""
+        if not self._switch_tab_callback:
+            return "Error: Editor connection not available."
+        
+        try:
+            self._switch_tab_callback(tab_identifier)
+            return f"Switched to tab: {tab_identifier}"
+        except Exception as e:
+            return f"Error switching tab: {str(e)}"
+    
+    @pyqtSlot(str)
+    def on_tool_call_started(self, tool_name: str):
+        """Handle when a tool call starts."""
+        self.status_label.setText(f"🔧 Using tool: {tool_name}...")
+    
+    @pyqtSlot(str, str)
+    def on_tool_call_completed(self, tool_name: str, result: str):
+        """Handle when a tool call completes."""
+        # Show a brief status of tool completion
+        status = "✓" if "Error" not in result else "✗"
+        self.status_label.setText(f"🔧 {tool_name}: {status}")
+    
     def call_ai_api(self, user_message, context_info=""):
-        """Make an API call to the AI service."""
+        """Make an API call to the AI service with agentic capabilities."""
         if not self.settings_manager.is_configured():
             self.add_ai_message(
                 "⚠️ API not configured!\n\n"
@@ -618,17 +750,7 @@ The user is currently working with an XML document in the editor."""
             {"role": "system", "content": self.SYSTEM_PROMPT}
         ]
         
-        # Add XML context if available
-        if self.xml_content.strip():
-            # Truncate very long XML to avoid token limits
-            max_len = self.MAX_XML_CONTEXT_LENGTH
-            xml_preview = self.xml_content[:max_len] if len(self.xml_content) > max_len else self.xml_content
-            context_msg = f"Current XML document:\n```xml\n{xml_preview}\n```"
-            if len(self.xml_content) > max_len:
-                context_msg += f"\n(Truncated, full document is {len(self.xml_content)} characters)"
-            messages.append({"role": "system", "content": context_msg})
-        
-        # Add context info if provided
+        # Add context info if provided (e.g., for quick actions)
         if context_info:
             messages.append({"role": "system", "content": context_info})
         
@@ -645,15 +767,18 @@ The user is currently working with an XML document in the editor."""
         self.set_input_enabled(False)
         self.status_label.setText("⏳ Waiting for AI response...")
         
-        # Start the worker thread
-        self.worker_thread = AIWorkerThread(
+        # Start the agentic worker thread with tool support
+        self.worker_thread = AIAgentWorkerThread(
             self.settings_manager.get_api_url(),
             self.settings_manager.get_api_key(),
             self.settings_manager.get_model(),
-            messages
+            messages,
+            self.tool_executor
         )
         self.worker_thread.response_ready.connect(self.on_ai_response)
         self.worker_thread.error_occurred.connect(self.on_ai_error)
+        self.worker_thread.tool_call_started.connect(self.on_tool_call_started)
+        self.worker_thread.tool_call_completed.connect(self.on_tool_call_completed)
         self.worker_thread.start()
     
     @pyqtSlot(str)
