@@ -4,7 +4,7 @@ Provides function calling tools that allow the AI assistant to interact with the
 """
 
 import json
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
 from dataclasses import dataclass
 
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -154,7 +154,7 @@ class AgentToolExecutor:
     """
     
     def __init__(self):
-        self._callbacks: dict[str, Callable] = {}
+        self._callbacks: Dict[str, Callable] = {}
     
     def register_callback(self, tool_name: str, callback: Callable) -> None:
         """Register a callback function for a specific tool."""
@@ -230,7 +230,7 @@ class AIAgentWorkerThread(QThread):
                     base_url=base_url,
                     api_key=self.api_key,
                     default_headers={
-                        "HTTP-Referer": "https://github.com/xml-editor",
+                        "HTTP-Referer": "https://github.com/profiluefter/xml-editor",
                         "X-Title": "XML Editor AI Assistant"
                     }
                 )

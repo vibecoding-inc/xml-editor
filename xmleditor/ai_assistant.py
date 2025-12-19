@@ -398,7 +398,7 @@ class AIWorkerThread(QThread):
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.api_key}",
-                "HTTP-Referer": "https://github.com/xml-editor",
+                "HTTP-Referer": "https://github.com/profiluefter/xml-editor",
                 "X-Title": "XML Editor AI Assistant"
             }
             
