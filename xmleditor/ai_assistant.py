@@ -5,16 +5,13 @@ Provides an AI-powered assistant to help with XML editing tasks.
 
 import html
 import re
-import json
-import urllib.request
-import urllib.error
 from collections import OrderedDict
 from lxml import etree
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton,
     QLabel, QComboBox, QScrollArea, QFrame, QApplication, QTextBrowser
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot, QEvent
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QEvent
 from PyQt6.QtGui import QFont, QKeyEvent
 
 from xmleditor.ai_settings_dialog import AISettingsManager, AISettingsDialog
@@ -370,72 +367,6 @@ class MarkdownRenderer:
     def get_styles(cls):
         """Return the CSS styles for the chat display."""
         return cls.STYLES
-
-
-class AIWorkerThread(QThread):
-    """Worker thread for making AI API calls without blocking the UI."""
-    
-    response_ready = pyqtSignal(str)
-    error_occurred = pyqtSignal(str)
-    
-    def __init__(self, api_url, api_key, model, messages):
-        super().__init__()
-        self.api_url = api_url
-        self.api_key = api_key
-        self.model = model
-        self.messages = messages
-    
-    def run(self):
-        """Execute the API call."""
-        try:
-            data = json.dumps({
-                "model": self.model,
-                "messages": self.messages,
-                "max_tokens": 2000,
-                "temperature": 0.7
-            }).encode('utf-8')
-            
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-                "HTTP-Referer": "https://github.com/profiluefter/xml-editor",
-                "X-Title": "XML Editor AI Assistant"
-            }
-            
-            req = urllib.request.Request(self.api_url, data=data, headers=headers, method='POST')
-            
-            with urllib.request.urlopen(req, timeout=60) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                
-                if 'choices' in result and len(result['choices']) > 0:
-                    message = result['choices'][0].get('message', {})
-                    content = message.get('content', 'No response content')
-                    self.response_ready.emit(content)
-                else:
-                    self.error_occurred.emit("Unexpected API response format")
-        
-        except urllib.error.HTTPError as e:
-            error_body = ""
-            try:
-                error_body = e.read().decode('utf-8')
-            except Exception:
-                pass
-            
-            if e.code == 401:
-                self.error_occurred.emit("Invalid API key. Please check your settings.")
-            elif e.code == 429:
-                self.error_occurred.emit("Rate limit exceeded. Please wait and try again.")
-            else:
-                self.error_occurred.emit(f"API Error ({e.code}): {error_body[:100]}")
-        
-        except urllib.error.URLError as e:
-            self.error_occurred.emit(f"Connection error: {str(e.reason)}")
-        
-        except json.JSONDecodeError:
-            self.error_occurred.emit("Failed to parse API response")
-        
-        except Exception as e:
-            self.error_occurred.emit(f"Error: {str(e)}")
 
 
 class AIAssistantPanel(QWidget):

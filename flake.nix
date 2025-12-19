@@ -161,6 +161,7 @@
             propagatedBuildInputs = with pkgs.python3Packages; [
               lxml
               pygments
+              openai
             ] ++ pkgs.lib.optionals gui [
               pyqt6
               pyqt6-sip
@@ -314,6 +315,7 @@ print('✓ XML formatting works')
             python3Packages.pyqt6
             python3Packages.lxml
             python3Packages.pygments
+            python3Packages.openai
             python3Packages.setuptools
             python3Packages.wheel
             qt6.qtbase
