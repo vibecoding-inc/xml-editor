@@ -248,15 +248,25 @@ class AIAgentWorkerThread(QThread):
             while iterations < self.MAX_TOOL_ITERATIONS:
                 iterations += 1
                 
+                # Build API call parameters
+                api_params = {
+                    "model": self.model,
+                    "messages": messages,
+                    "tools": AGENT_TOOLS,
+                    "tool_choice": "auto",
+                    "max_tokens": 2000,
+                    "temperature": 0.7,
+                }
+                
+                # Add OpenRouter-specific parameters for Gemini and other reasoning models
+                # This preserves reasoning blocks as required by OpenRouter
+                # See: https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+                api_params["extra_body"] = {
+                    "include": ["reasoning"]
+                }
+                
                 # Make API call with tools
-                response = client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=AGENT_TOOLS,
-                    tool_choice="auto",
-                    max_tokens=2000,
-                    temperature=0.7
-                )
+                response = client.chat.completions.create(**api_params)
                 
                 assistant_message = response.choices[0].message
                 
